@@ -11,6 +11,47 @@ The data locations that `claudepath` handles:
 - `~/.claude/history.jsonl` - prompt history with project paths
 - `~/.claude/usage-data/session-meta/*.json` - session stats with project_path
 
+## Additional data locations discovered
+
+By inspecting the `~/.claude/` directory structure and reviewing the [`claude project purge` documentation](https://docs.anthropic.com/en/docs/claude-code/cli-reference), we found additional locations that store project-related data:
+
+### `~/.claude.json` - `projects` entry
+
+Has a top-level `projects` object keyed by absolute path:
+
+```json
+{
+  "projects": {
+    "/Users/gverni/devai/claude-move": {
+      "allowedTools": [],
+      "mcpServers": {},
+      "lastSessionId": "...",
+      "lastCost": 0
+    }
+  }
+}
+```
+
+When the path changes, the old entry becomes orphaned and Claude Code creates a fresh entry for the new path. The user loses:
+- `allowedTools` - tool permissions previously granted
+- `mcpServers` - per-project MCP server config
+- `disabledMcpjsonServers` / `enabledMcpjsonServers`
+- Session statistics (cosmetic)
+
+**Status**: not yet handled by `mv`/`remap`. Needs implementation.
+
+### `~/.claude/tasks/{session-id}/`
+
+Keyed by session ID, not project path. No action needed during a move.
+
+### `~/.claude/file-history/{session-id}/`
+
+Keyed by session ID. No action needed during a move.
+
+### `~/.claude/debug/`
+
+Per-session debug logs. Keyed by session ID. No action needed during a move.
+
 ---
 
 ## Path encoding
@@ -115,4 +156,3 @@ If any step fails during `mv`, the directory is copied back from new to old.
 When `--dry-run` is passed, all steps compute what would change but write nothing to disk.
 
 ---
-
