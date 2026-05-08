@@ -42,7 +42,6 @@ describe("moveProject", () => {
     assert.ok(existsSync(dstDir));
     assert.equal(readFileSync(join(dstDir, "file.txt"), "utf-8"), "hello");
     assert.ok(result.projectDirRenamed);
-    assert.equal(result.jsonlFilesUpdated, 1);
     assert.equal(result.historyLinesChanged, 1);
   });
 
@@ -121,7 +120,6 @@ describe("remapProject", () => {
     });
 
     assert.ok(result.projectDirRenamed);
-    assert.equal(result.jsonlFilesUpdated, 1);
     assert.equal(result.historyLinesChanged, 1);
   });
 

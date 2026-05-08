@@ -46,7 +46,6 @@ program
   .option("--dry-run", "Preview changes without modifying files")
   .option("--no-backup", "Skip creating a backup")
   .option("--yes, -y", "Skip confirmation prompt")
-  .option("--merge", "Merge sessions if destination already has Claude data")
   .option("--verbose, -v", "Show detailed output")
   .option("--claude-dir <path>", "Override Claude data directory")
   .action(async (oldPath, newPath, opts) => {
@@ -60,7 +59,6 @@ program
   .option("--dry-run", "Preview changes without modifying files")
   .option("--no-backup", "Skip creating a backup")
   .option("--yes, -y", "Skip confirmation prompt")
-  .option("--merge", "Merge sessions if destination already has Claude data")
   .option("--verbose, -v", "Show detailed output")
   .option("--claude-dir <path>", "Override Claude data directory")
   .action(async (oldPath, newPath, opts) => {

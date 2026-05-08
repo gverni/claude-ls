@@ -73,27 +73,6 @@ export function updateSessionsIndex(indexPath, oldPath, newPath, newEncodedDir, 
   return changed ? 1 : 0;
 }
 
-export function updateJsonlFiles(projectDir, oldPath, newPath, { dryRun = false, verbose = false } = {}) {
-  let filesUpdated = 0;
-  let totalLinesChanged = 0;
-
-  const jsonlFiles = findJsonlFilesRecursive(projectDir);
-
-  for (const file of jsonlFiles) {
-    const linesChanged = replaceInFile(file, oldPath, newPath, dryRun);
-    if (linesChanged > 0) {
-      filesUpdated++;
-      totalLinesChanged += linesChanged;
-      if (verbose) {
-        const rel = file.slice(projectDir.length + 1);
-        process.stderr.write(`    ${rel}: ${linesChanged} line(s) changed\n`);
-      }
-    }
-  }
-
-  return { filesUpdated, totalLinesChanged };
-}
-
 export function updateHistory(historyPath, oldPath, newPath, { dryRun = false, verbose = false } = {}) {
   if (!existsSync(historyPath)) return 0;
   const count = replaceInFile(historyPath, oldPath, newPath, dryRun);
@@ -103,48 +82,6 @@ export function updateHistory(historyPath, oldPath, newPath, { dryRun = false, v
   return count;
 }
 
-export function mergeSessionsIndex(dstIndex, srcIndex, oldPath, newPath, newEncoded, { dryRun = false } = {}) {
-  if (!existsSync(dstIndex) || !existsSync(srcIndex)) return 0;
-
-  let dstData, srcData;
-  try {
-    dstData = JSON.parse(readFileSync(dstIndex, "utf-8"));
-    srcData = JSON.parse(readFileSync(srcIndex, "utf-8"));
-  } catch {
-    return 0;
-  }
-
-  const oldEncoded = encodePath(oldPath);
-  const existingIds = new Set((dstData.entries || []).map((e) => e.sessionId));
-
-  let merged = 0;
-  for (const entry of srcData.entries || []) {
-    if (existingIds.has(entry.sessionId)) {
-      process.stderr.write(`  Warning: skipping duplicate session '${entry.sessionId}'\n`);
-      continue;
-    }
-    if (entry.projectPath === oldPath) {
-      entry.projectPath = newPath;
-    }
-    const fullPath = entry.fullPath || "";
-    if (fullPath.includes(oldEncoded)) {
-      entry.fullPath = fullPath.replace(oldEncoded, newEncoded);
-    }
-    if (!dstData.entries) dstData.entries = [];
-    dstData.entries.push(entry);
-    merged++;
-  }
-
-  if (dstData.originalPath === oldPath) {
-    dstData.originalPath = newPath;
-  }
-
-  if (merged > 0 && !dryRun) {
-    writeFileSync(dstIndex, JSON.stringify(dstData, null, 2), "utf-8");
-  }
-
-  return merged;
-}
 
 export function replacePathValues(obj, oldPath, newPath) {
   let changed = false;
@@ -212,17 +149,3 @@ function replaceInFile(filePath, oldPath, newPath, dryRun) {
   return linesChanged;
 }
 
-function findJsonlFilesRecursive(dir) {
-  const results = [];
-  try {
-    const entries = readdirSync(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      const full = join(dir, entry.name);
-      if (entry.isDirectory()) results.push(...findJsonlFilesRecursive(full));
-      else if (entry.name.endsWith(".jsonl")) results.push(full);
-    }
-  } catch {
-    // ignore
-  }
-  return results;
-}

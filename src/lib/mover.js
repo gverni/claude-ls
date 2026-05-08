@@ -2,7 +2,7 @@ import { existsSync, readdirSync, renameSync, cpSync, rmSync } from "fs";
 import { resolve, join } from "path";
 import { encodePath } from "./encoder.js";
 import { findClaudeDir, findProjectDir } from "./scanner.js";
-import { mergeSessionsIndex, updateHistory, updateJsonlFiles, updateSessionsIndex, updateUsageData } from "./updaters.js";
+import { updateHistory, updateSessionsIndex, updateUsageData } from "./updaters.js";
 
 export class MoveError extends Error {
   constructor(message) {
@@ -14,10 +14,7 @@ export class MoveError extends Error {
 class MoveResult {
   constructor() {
     this.projectDirRenamed = false;
-    this.sessionsMerged = 0;
     this.sessionsIndexUpdated = 0;
-    this.jsonlFilesUpdated = 0;
-    this.jsonlLinesChanged = 0;
     this.historyLinesChanged = 0;
     this.usageDataUpdated = 0;
     this.backupPath = null;
@@ -30,14 +27,8 @@ class MoveResult {
     if (this.projectDirRenamed) {
       lines.push(`${prefix}renamed project directory in ~/.claude/projects/`);
     }
-    if (this.sessionsMerged) {
-      lines.push(`${prefix}merged ${this.sessionsMerged} session(s) from old directory into new`);
-    }
     if (this.sessionsIndexUpdated) {
       lines.push(`${prefix}updated sessions-index.json`);
-    }
-    if (this.jsonlFilesUpdated) {
-      lines.push(`${prefix}updated ${this.jsonlFilesUpdated} session file(s) (${this.jsonlLinesChanged} line(s) changed)`);
     }
     if (this.historyLinesChanged) {
       lines.push(`${prefix}updated ${this.historyLinesChanged} line(s) in history.jsonl`);
@@ -67,33 +58,14 @@ function findJsonlFilesRecursive(dir) {
   return results;
 }
 
-function mergeProjectDirs(src, dst, dryRun) {
-  const srcJsonl = findJsonlFilesRecursive(src);
-  if (dryRun) return srcJsonl.length;
-
-  cpSync(src, dst, {
-    recursive: true,
-    filter: (source) => !source.endsWith("sessions-index.json"),
-  });
-  rmSync(src, { recursive: true });
-  return srcJsonl.length;
-}
-
-function renameAndUpdate(projectDir, newProjectDir, historyPath, oldPath, newPath, newEncoded, dryRun, merge, verbose, result) {
+function renameAndUpdate(projectDir, newProjectDir, historyPath, oldPath, newPath, newEncoded, dryRun, verbose, result) {
   if (projectDir && existsSync(projectDir)) {
     if (existsSync(newProjectDir)) {
-      if (!merge) {
-        throw new MoveError(
-          `Destination Claude data directory already exists: ${newProjectDir}\nUse --merge to combine sessions from both directories.`
-        );
-      }
-      const srcIndex = join(projectDir, "sessions-index.json");
-      const dstIndex = join(newProjectDir, "sessions-index.json");
-      result.sessionsMerged = mergeSessionsIndex(dstIndex, srcIndex, oldPath, newPath, newEncoded, { dryRun });
-      mergeProjectDirs(projectDir, newProjectDir, dryRun);
-    } else {
-      if (!dryRun) renameSync(projectDir, newProjectDir);
+      throw new MoveError(
+        `Destination Claude data directory already exists: ${newProjectDir}`
+      );
     }
+    if (!dryRun) renameSync(projectDir, newProjectDir);
     result.projectDirRenamed = true;
   }
 
@@ -108,16 +80,13 @@ function updateDataFiles(projectDir, historyPath, oldPath, newPath, newEncoded, 
     const indexPath = join(projectDir, "sessions-index.json");
     result.sessionsIndexUpdated = updateSessionsIndex(indexPath, oldPath, newPath, newEncoded, { dryRun, verbose });
 
-    const { filesUpdated, totalLinesChanged } = updateJsonlFiles(projectDir, oldPath, newPath, { dryRun, verbose });
-    result.jsonlFilesUpdated = filesUpdated;
-    result.jsonlLinesChanged = totalLinesChanged;
   }
 
   result.historyLinesChanged = updateHistory(historyPath, oldPath, newPath, { dryRun, verbose });
   result.usageDataUpdated = updateUsageData(claudeDir, oldPath, newPath, { dryRun, verbose });
 }
 
-function prepareOperation(oldPath, newPath, claudeDir, dryRun, noBackup, merge, verbose) {
+function prepareOperation(oldPath, newPath, claudeDir, dryRun, noBackup, verbose) {
   if (!claudeDir) claudeDir = findClaudeDir();
 
   const result = new MoveResult();
@@ -150,7 +119,7 @@ export function previewOperation(oldPath, claudeDir = null) {
   };
 }
 
-export function moveProject(oldPath, newPath, { claudeDir = null, dryRun = false, noBackup = false, merge = false, verbose = false } = {}) {
+export function moveProject(oldPath, newPath, { claudeDir = null, dryRun = false, noBackup = false, verbose = false } = {}) {
   oldPath = resolve(oldPath);
   newPath = resolve(newPath);
 
@@ -165,7 +134,7 @@ export function moveProject(oldPath, newPath, { claudeDir = null, dryRun = false
     }
   }
 
-  const { result, projectDir, newProjectDir, historyPath, newEncoded } = prepareOperation(oldPath, newPath, claudeDir, dryRun, noBackup, merge, verbose);
+  const { result, projectDir, newProjectDir, historyPath, newEncoded } = prepareOperation(oldPath, newPath, claudeDir, dryRun, noBackup, verbose);
 
   try {
     if (!dryRun) {
@@ -174,7 +143,7 @@ export function moveProject(oldPath, newPath, { claudeDir = null, dryRun = false
       rmSync(oldPath, { recursive: true });
     }
 
-    renameAndUpdate(projectDir, newProjectDir, historyPath, oldPath, newPath, newEncoded, dryRun, merge, verbose, result);
+    renameAndUpdate(projectDir, newProjectDir, historyPath, oldPath, newPath, newEncoded, dryRun, verbose, result);
   } catch (e) {
     if (!dryRun && existsSync(newPath) && !existsSync(oldPath)) {
       cpSync(newPath, oldPath, { recursive: true });
@@ -187,7 +156,7 @@ export function moveProject(oldPath, newPath, { claudeDir = null, dryRun = false
   return result;
 }
 
-export function remapProject(oldPath, newPath, { claudeDir = null, dryRun = false, noBackup = false, merge = false, verbose = false } = {}) {
+export function remapProject(oldPath, newPath, { claudeDir = null, dryRun = false, noBackup = false, verbose = false } = {}) {
   oldPath = resolve(oldPath);
   newPath = resolve(newPath);
 
@@ -198,10 +167,10 @@ export function remapProject(oldPath, newPath, { claudeDir = null, dryRun = fals
     );
   }
 
-  const { result, projectDir, newProjectDir, historyPath, newEncoded } = prepareOperation(oldPath, newPath, claudeDir, dryRun, noBackup, merge, verbose);
+  const { result, projectDir, newProjectDir, historyPath, newEncoded } = prepareOperation(oldPath, newPath, claudeDir, dryRun, noBackup, verbose);
 
   try {
-    renameAndUpdate(projectDir, newProjectDir, historyPath, oldPath, newPath, newEncoded, dryRun, merge, verbose, result);
+    renameAndUpdate(projectDir, newProjectDir, historyPath, oldPath, newPath, newEncoded, dryRun, verbose, result);
   } catch (e) {
     if (e instanceof MoveError) throw e;
     throw new MoveError(`Remap failed: ${e.message}\nChanges have been rolled back.`);

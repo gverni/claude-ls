@@ -50,7 +50,6 @@ export async function mvCommand(oldPath, newPath, opts = {}) {
       claudeDir,
       dryRun: opts.dryRun,
       noBackup: opts.noBackup,
-      merge: opts.merge,
       verbose: opts.verbose,
     });
     console.log(chalk.green.bold("● Done!"));

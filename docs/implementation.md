@@ -36,7 +36,7 @@ This document maps that structure to what `claude-ls` handles. If the official d
 |----------|----------|--------------|-----------|----------|--------|
 | `~/.claude/projects/{encoded}/` | Encoded path | **Handled** - directory renamed | - | - | Used for discovery |
 | `~/.claude/projects/{encoded}/sessions-index.json` | Encoded path | **Handled** - fields updated | Useful (session count, last active) | - | Used for metadata |
-| `~/.claude/projects/{encoded}/<session>.jsonl` | Session ID within encoded dir | **Handled** - path refs replaced | - | Searchable (with `--sessions`) | - |
+| `~/.claude/projects/{encoded}/<session>.jsonl` | Session ID within encoded dir | Not updated (transcripts only) | - | Searchable (with `--sessions`) | - |
 | `~/.claude/projects/{encoded}/<session>/tool-results/` | Session ID within encoded dir | **Handled** - moved with directory rename | - | - | - |
 | `~/.claude/projects/{encoded}/memory/` | Encoded path | **Handled** - moved with directory rename | Useful (project memory) | Searchable | - |
 
@@ -154,7 +154,7 @@ Uses `cpSync` + `rmSync` to move `/old/path` to `/new/path`.
 ~/.claude/projects/-old-path/  ->  ~/.claude/projects/-new-path/
 ```
 
-If the destination already exists and `--merge` is passed, session files are merged instead.
+If the destination already exists, the command errors out.
 
 ### Step 3: Update `sessions-index.json`
 
@@ -163,17 +163,17 @@ Fields updated:
 - `entries[*].projectPath`
 - `entries[*].fullPath`
 
-### Step 4: Update all `.jsonl` session files
+### Step 4: Update `history.jsonl`
 
 Each line is parsed as JSON. Any string value that exactly equals the old path or starts with `old_path/` is replaced. This avoids substring corruption (e.g. `/Users/foo` won't match `/Users/foobar`).
 
-### Step 5: Update `history.jsonl`
-
-Same line-by-line JSON replacement as Step 4.
-
-### Step 6: Update usage-data
+### Step 5: Update usage-data
 
 Files: `~/.claude/usage-data/session-meta/*.json`. If `project_path` matches the old path (exact or prefix), it's replaced.
+
+### Not updated: session `.jsonl` files
+
+Session `.jsonl` files are conversation transcripts only. They have no functional impact on Claude Code, so paths inside them are left unchanged.
 
 ---
 
@@ -200,4 +200,4 @@ When `--dry-run` is passed, all steps compute what would change but write nothin
 ## TODO
 
 - [ ] Handle `~/.claude.json` `projects` entry (rename key from old path to new path)
-- [ ] Respect `CLAUDE_CONFIG_DIR` environment variable in `findClaudeDir()`
+- [x] Respect `CLAUDE_CONFIG_DIR` environment variable in `findClaudeDir()`

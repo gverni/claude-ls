@@ -5,7 +5,6 @@ import { join } from "path";
 import { createTestClaudeDir } from "./fixtures.js";
 import {
   updateSessionsIndex,
-  updateJsonlFiles,
   updateHistory,
   updateUsageData,
   replacePathValues,
@@ -85,37 +84,6 @@ describe("updateSessionsIndex", () => {
     updateSessionsIndex(indexPath, "/old/project", "/new/project", "-new-project", { dryRun: true });
     const after = readFileSync(indexPath, "utf-8");
     assert.equal(before, after);
-  });
-});
-
-describe("updateJsonlFiles", () => {
-  let fixture;
-
-  beforeEach(() => {
-    fixture = createTestClaudeDir();
-  });
-
-  afterEach(() => {
-    fixture.cleanup();
-  });
-
-  it("replaces paths in jsonl session files", () => {
-    const dir = fixture.addProject({
-      path: "/old/project",
-      sessions: [{
-        id: "s1",
-        modified: "2026-01-01T00:00:00",
-        content: JSON.stringify({ type: "human", cwd: "/old/project", message: "hi" }),
-      }],
-    });
-
-    const { filesUpdated, totalLinesChanged } = updateJsonlFiles(dir, "/old/project", "/new/project");
-    assert.equal(filesUpdated, 1);
-    assert.equal(totalLinesChanged, 1);
-
-    const content = readFileSync(join(dir, "s1.jsonl"), "utf-8");
-    assert.ok(content.includes("/new/project"));
-    assert.ok(!content.includes("/old/project"));
   });
 });
 

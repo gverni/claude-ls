@@ -57,15 +57,17 @@ Move a project directory and update all Claude Code internal references.
 - Actual project directory on disk
 - `~/.claude/projects/{encoded}/` directory (renamed)
 - `sessions-index.json` - originalPath, projectPath, fullPath fields
-- All `.jsonl` session files - path references in JSON values
 - `~/.claude/history.jsonl` - project field
 - `~/.claude/usage-data/session-meta/*.json` - project_path field
+
+Note: session `.jsonl` files are conversation transcripts only and are not updated (no functional impact).
+
+If the destination Claude data directory already exists, the command errors out.
 
 **Flags:**
 - `--dry-run` - preview changes without modifying files
 - `--no-backup` - skip backup creation
 - `--yes` / `-y` - skip confirmation prompt
-- `--merge` - merge sessions if destination already has Claude data
 - `--verbose` / `-v` - show detailed output
 - `--claude-dir <path>` - override Claude data directory
 
