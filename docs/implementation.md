@@ -1,56 +1,96 @@
 # Implementation Details
 
-## How we learned about Claude Code's data layout
+## Source of truth
 
-The initial implementation is based on the Python tool [claudepath](https://github.com/Mahiler1909/claudepath) by Fernando Chullo. That tool handles moving/renaming Claude Code projects and documents which files need updating. We migrated its logic to Node.js.
+The official Claude Code directory structure is documented at:
+https://code.claude.com/docs/en/claude-directory
 
-The data locations that `claudepath` handles:
-- `~/.claude/projects/{encoded}/` - session transcripts and sessions-index.json
-- `~/.claude/projects/{encoded}/sessions-index.json` - project path references
-- `~/.claude/projects/{encoded}/**/*.jsonl` - session files with path references
-- `~/.claude/history.jsonl` - prompt history with project paths
-- `~/.claude/usage-data/session-meta/*.json` - session stats with project_path
+This document maps that structure to what `claude-ls` handles. If the official docs change, compare with this document to identify new data locations that may need updating.
 
-## Additional data locations discovered
+---
 
-By inspecting the `~/.claude/` directory structure and reviewing the [`claude project purge` documentation](https://docs.anthropic.com/en/docs/claude-code/cli-reference), we found additional locations that store project-related data:
+## Claude Code data layout (from official docs)
 
-### `~/.claude.json` - `projects` entry
+### Global state
 
-Has a top-level `projects` object keyed by absolute path:
+| Location | Keyed by | `mv`/`remap` | `inspect` | `search` |
+|----------|----------|--------------|-----------|----------|
+| `~/.claude.json` | - (has `projects` object keyed by path) | **TODO** - needs path key rename | Useful (permissions, MCPs) | - |
+| `~/.claude/settings.json` | - | No path refs | Useful (global vs project comparison) | Searchable |
+| `~/.claude/CLAUDE.md` | - | No path refs | Useful (global instructions) | Searchable |
+| `~/.claude/history.jsonl` | - (lines have `project` field) | **Handled** | - | Searchable |
+| `~/.claude/stats-cache.json` | - | No path refs | - | - |
+| `~/.claude/keybindings.json` | - | No path refs | - | - |
+| `~/.claude/plugins/` | - | No path refs | Useful (installed plugins) | - |
+| `~/.claude/themes/` | - | No path refs | - | - |
+| `~/.claude/rules/` | - | No path refs | Useful (global rules) | Searchable |
+| `~/.claude/skills/` | - | No path refs | Useful (global skills) | Searchable |
+| `~/.claude/commands/` | - | No path refs | Useful (global commands) | Searchable |
+| `~/.claude/output-styles/` | - | No path refs | - | - |
+| `~/.claude/agents/` | - | No path refs | Useful (global agents) | Searchable |
+| `~/.claude/agent-memory/` | - | No path refs | Useful (global memory) | Searchable |
 
-```json
-{
-  "projects": {
-    "/Users/gverni/devai/claude-move": {
-      "allowedTools": [],
-      "mcpServers": {},
-      "lastSessionId": "...",
-      "lastCost": 0
-    }
-  }
-}
-```
+### Per-project data (encoded path)
 
-When the path changes, the old entry becomes orphaned and Claude Code creates a fresh entry for the new path. The user loses:
-- `allowedTools` - tool permissions previously granted
-- `mcpServers` - per-project MCP server config
-- `disabledMcpjsonServers` / `enabledMcpjsonServers`
-- Session statistics (cosmetic)
+| Location | Keyed by | `mv`/`remap` | `inspect` | `search` | `list` |
+|----------|----------|--------------|-----------|----------|--------|
+| `~/.claude/projects/{encoded}/` | Encoded path | **Handled** - directory renamed | - | - | Used for discovery |
+| `~/.claude/projects/{encoded}/sessions-index.json` | Encoded path | **Handled** - fields updated | Useful (session count, last active) | - | Used for metadata |
+| `~/.claude/projects/{encoded}/<session>.jsonl` | Session ID within encoded dir | **Handled** - path refs replaced | - | Searchable (with `--sessions`) | - |
+| `~/.claude/projects/{encoded}/<session>/tool-results/` | Session ID within encoded dir | **Handled** - moved with directory rename | - | - | - |
+| `~/.claude/projects/{encoded}/memory/` | Encoded path | **Handled** - moved with directory rename | Useful (project memory) | Searchable | - |
 
-**Status**: not yet handled by `mv`/`remap`. Needs implementation.
+### Per-session data (session ID)
 
-### `~/.claude/tasks/{session-id}/`
+| Location | Keyed by | `mv`/`remap` | `inspect` | `search` | `list` |
+|----------|----------|--------------|-----------|----------|--------|
+| `~/.claude/file-history/{session}/` | Session ID | No action needed | - | - | - |
+| `~/.claude/tasks/{session}/` | Session ID | No action needed | - | - | - |
+| `~/.claude/debug/` | Session ID | No action needed | - | - | - |
+| `~/.claude/plans/` | Session ID | No action needed | - | - | - |
+| `~/.claude/paste-cache/` | Session ID | No action needed | - | - | - |
+| `~/.claude/image-cache/` | Session ID | No action needed | - | - | - |
+| `~/.claude/session-env/` | Session ID | No action needed | - | - | - |
+| `~/.claude/shell-snapshots/` | Session ID | No action needed | - | - | - |
+| `~/.claude/backups/` | Timestamp | No action needed | - | - | - |
 
-Keyed by session ID, not project path. No action needed during a move.
+### Per-session stats
 
-### `~/.claude/file-history/{session-id}/`
+| Location | Keyed by | `mv`/`remap` | `inspect` | `search` | `list` |
+|----------|----------|--------------|-----------|----------|--------|
+| `~/.claude/usage-data/session-meta/*.json` | Session ID (file has `project_path`) | **Handled** - project_path replaced | Useful (cost, token usage) | - | - |
 
-Keyed by session ID. No action needed during a move.
+### Project-level files (in the project directory itself)
 
-### `~/.claude/debug/`
+These live inside the project directory and move with it during `mv`. They are relevant to `inspect` and `search`.
 
-Per-session debug logs. Keyed by session ID. No action needed during a move.
+| Location | `mv`/`remap` | `inspect` | `search` |
+|----------|--------------|-----------|----------|
+| `CLAUDE.md` | Moves with project dir | Useful (project instructions) | Searchable |
+| `.mcp.json` | Moves with project dir | Useful (project MCP servers) | Searchable |
+| `.claude/settings.json` | Moves with project dir | Useful (permissions, hooks) | Searchable |
+| `.claude/settings.local.json` | Moves with project dir | Useful (local overrides) | Searchable |
+| `.claude/rules/` | Moves with project dir | Useful (project rules) | Searchable |
+| `.claude/skills/` | Moves with project dir | Useful (project skills) | Searchable |
+| `.claude/commands/` | Moves with project dir | Useful (project commands) | Searchable |
+| `.claude/agents/` | Moves with project dir | Useful (project agents) | Searchable |
+| `.claude/agent-memory/` | Moves with project dir | Useful (project agent memory) | Searchable |
+| `.claude/agent-memory-local/` | Moves with project dir | Useful (local agent memory) | - |
+
+### Config directory override
+
+The official docs mention `CLAUDE_CONFIG_DIR` environment variable which redirects `~/.claude` entirely. Our `findClaudeDir()` should respect this.
+
+**Status**: not yet handled.
+
+---
+
+## What we learned from
+
+1. **[claudepath](https://github.com/Mahiler1909/claudepath)** (Python tool by Fernando Chullo) - initial source for the move logic and the data locations it updates
+2. **Inspecting `~/.claude/` directory** - discovered `tasks/`, `debug/`, `file-history/` structure and `~/.claude.json` projects entry
+3. **[`claude project purge` documentation](https://docs.anthropic.com/en/docs/claude-code/cli-reference)** - confirmed which locations are project-scoped
+4. **[Official `~/.claude` directory docs](https://code.claude.com/docs/en/claude-directory)** - complete reference for all data locations and their purpose
 
 ---
 
@@ -156,3 +196,8 @@ If any step fails during `mv`, the directory is copied back from new to old.
 When `--dry-run` is passed, all steps compute what would change but write nothing to disk.
 
 ---
+
+## TODO
+
+- [ ] Handle `~/.claude.json` `projects` entry (rename key from old path to new path)
+- [ ] Respect `CLAUDE_CONFIG_DIR` environment variable in `findClaudeDir()`

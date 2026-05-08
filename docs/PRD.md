@@ -96,18 +96,9 @@ Search across all projects for a string match.
 
 ---
 
-### `claude-ls prune`
+### ~~`claude-ls prune`~~ - removed
 
-Find and remove orphaned projects (source directory no longer exists).
-
-**Behaviour:**
-- Lists orphaned projects with session count and last active date
-- Asks for confirmation before deleting
-- Deletes the encoded directory from `~/.claude/projects/`
-
-**Flags:**
-- `--dry-run` - show what would be pruned without deleting
-- `--yes` / `-y` - skip confirmation
+Not implementing. Claude Code already provides `claude project purge` which handles deleting project state (transcripts, memory, tasks, debug, file-history, history.jsonl entries, and the project's entry in `~/.claude.json`). Users should use that command directly. Orphaned projects can be identified with `claude-ls list --orphaned`.
 
 ---
 
@@ -143,7 +134,6 @@ claude-ls/
       mv.js
       remap.js
       search.js
-      prune.js
       restore.js
     lib/
       encoder.js            Path encoding
@@ -163,7 +153,6 @@ claude-ls/
       inspect.test.js
       mv.test.js
       search.test.js
-      prune.test.js
       restore.test.js
 ```
 
@@ -199,8 +188,7 @@ Each command is developed end-to-end (test + lib + command) before moving to the
 2. **list** - scanner lib + list command
 3. **inspect** - inspect command (reads project settings, MCPs, CLAUDE.md, memory)
 4. **search** - search command (searches across projects)
-5. **prune** - prune command (find/remove orphaned)
-6. **mv** - updaters lib + mover lib + mv command
+5. **mv** - updaters lib + mover lib + mv command
 7. **remap** - remap command (reuses mover lib)
 
 Phase 2:
@@ -220,6 +208,6 @@ Phase 2:
 - `claude-ls mv` successfully moves a project and all references update
 - `claude-ls inspect` displays settings, MCPs, and CLAUDE.md for any project
 - `claude-ls search` finds matching projects
-- `claude-ls prune` safely removes only orphaned data
+- Orphaned projects identifiable via `claude-ls list --orphaned` (removal delegated to `claude project purge`)
 - All commands have `--json` output where applicable for scripting
 - Full test suite passes with `npm test`
