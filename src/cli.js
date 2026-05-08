@@ -79,15 +79,5 @@ program
     await searchCommand(query, opts);
   });
 
-program
-  .command("prune")
-  .description("Find and remove orphaned projects")
-  .option("--dry-run", "Show what would be pruned without deleting")
-  .option("--yes, -y", "Skip confirmation")
-  .option("--claude-dir <path>", "Override Claude data directory")
-  .action(async (opts) => {
-    const { pruneCommand } = await import("./commands/prune.js");
-    await pruneCommand(opts);
-  });
 
 program.parse();

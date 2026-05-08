@@ -61,10 +61,6 @@ Show project properties (settings, MCPs, CLAUDE.md, memory, sessions).
 
 Search across all projects (CLAUDE.md, settings, session content).
 
-### `claude-ls prune` - coming soon
-
-Find and remove orphaned projects whose source directory no longer exists.
-
 ## Status
 
 | Command   | Status      |
@@ -74,7 +70,6 @@ Find and remove orphaned projects whose source directory no longer exists.
 | `remap`   | done        |
 | `inspect` | coming soon |
 | `search`  | coming soon |
-| `prune`   | coming soon |
 
 ## Licence
 
