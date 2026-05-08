@@ -1,0 +1,188 @@
+import { describe, it, beforeEach, afterEach } from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync, writeFileSync, mkdirSync } from "fs";
+import { join } from "path";
+import { createTestClaudeDir } from "./fixtures.js";
+import {
+  updateSessionsIndex,
+  updateJsonlFiles,
+  updateHistory,
+  updateUsageData,
+  replacePathValues,
+} from "../src/lib/updaters.js";
+
+describe("replacePathValues", () => {
+  it("replaces exact path match in object values", () => {
+    const obj = { projectPath: "/old/path", other: "unrelated" };
+    const changed = replacePathValues(obj, "/old/path", "/new/path");
+    assert.equal(changed, true);
+    assert.equal(obj.projectPath, "/new/path");
+    assert.equal(obj.other, "unrelated");
+  });
+
+  it("replaces path prefix match", () => {
+    const obj = { fullPath: "/old/path/sub/file.jsonl" };
+    const changed = replacePathValues(obj, "/old/path", "/new/path");
+    assert.equal(changed, true);
+    assert.equal(obj.fullPath, "/new/path/sub/file.jsonl");
+  });
+
+  it("does not replace partial matches", () => {
+    const obj = { path: "/old/pathology" };
+    const changed = replacePathValues(obj, "/old/path", "/new/path");
+    assert.equal(changed, false);
+    assert.equal(obj.path, "/old/pathology");
+  });
+
+  it("recurses into nested objects and arrays", () => {
+    const obj = { entries: [{ projectPath: "/old/path" }] };
+    const changed = replacePathValues(obj, "/old/path", "/new/path");
+    assert.equal(changed, true);
+    assert.equal(obj.entries[0].projectPath, "/new/path");
+  });
+});
+
+describe("updateSessionsIndex", () => {
+  let fixture;
+
+  beforeEach(() => {
+    fixture = createTestClaudeDir();
+  });
+
+  afterEach(() => {
+    fixture.cleanup();
+  });
+
+  it("updates originalPath, projectPath, and fullPath", () => {
+    const dir = fixture.addProject({
+      path: "/old/project",
+      sessions: [{ id: "s1", modified: "2026-01-01T00:00:00" }],
+    });
+
+    const indexPath = join(dir, "sessions-index.json");
+    const result = updateSessionsIndex(indexPath, "/old/project", "/new/project", "-new-project");
+
+    assert.equal(result, 1);
+    const data = JSON.parse(readFileSync(indexPath, "utf-8"));
+    assert.equal(data.originalPath, "/new/project");
+    assert.equal(data.entries[0].projectPath, "/new/project");
+    assert.ok(data.entries[0].fullPath.includes("-new-project"));
+  });
+
+  it("returns 0 when file does not exist", () => {
+    const result = updateSessionsIndex("/nonexistent/path", "/old", "/new", "-new");
+    assert.equal(result, 0);
+  });
+
+  it("does not write in dry-run mode", () => {
+    const dir = fixture.addProject({
+      path: "/old/project",
+      sessions: [{ id: "s1", modified: "2026-01-01T00:00:00" }],
+    });
+
+    const indexPath = join(dir, "sessions-index.json");
+    const before = readFileSync(indexPath, "utf-8");
+    updateSessionsIndex(indexPath, "/old/project", "/new/project", "-new-project", { dryRun: true });
+    const after = readFileSync(indexPath, "utf-8");
+    assert.equal(before, after);
+  });
+});
+
+describe("updateJsonlFiles", () => {
+  let fixture;
+
+  beforeEach(() => {
+    fixture = createTestClaudeDir();
+  });
+
+  afterEach(() => {
+    fixture.cleanup();
+  });
+
+  it("replaces paths in jsonl session files", () => {
+    const dir = fixture.addProject({
+      path: "/old/project",
+      sessions: [{
+        id: "s1",
+        modified: "2026-01-01T00:00:00",
+        content: JSON.stringify({ type: "human", cwd: "/old/project", message: "hi" }),
+      }],
+    });
+
+    const { filesUpdated, totalLinesChanged } = updateJsonlFiles(dir, "/old/project", "/new/project");
+    assert.equal(filesUpdated, 1);
+    assert.equal(totalLinesChanged, 1);
+
+    const content = readFileSync(join(dir, "s1.jsonl"), "utf-8");
+    assert.ok(content.includes("/new/project"));
+    assert.ok(!content.includes("/old/project"));
+  });
+});
+
+describe("updateHistory", () => {
+  let fixture;
+
+  beforeEach(() => {
+    fixture = createTestClaudeDir();
+  });
+
+  afterEach(() => {
+    fixture.cleanup();
+  });
+
+  it("replaces paths in history.jsonl", () => {
+    fixture.addHistory([
+      { display: "test", project: "/old/project", timestamp: 1234 },
+      { display: "other", project: "/other/project", timestamp: 5678 },
+    ]);
+
+    const historyPath = join(fixture.claudeDir, "history.jsonl");
+    const count = updateHistory(historyPath, "/old/project", "/new/project");
+    assert.equal(count, 1);
+
+    const content = readFileSync(historyPath, "utf-8");
+    assert.ok(content.includes("/new/project"));
+    assert.ok(content.includes("/other/project"));
+  });
+
+  it("returns 0 when history does not exist", () => {
+    const count = updateHistory("/nonexistent/history.jsonl", "/old", "/new");
+    assert.equal(count, 0);
+  });
+});
+
+describe("updateUsageData", () => {
+  let fixture;
+
+  beforeEach(() => {
+    fixture = createTestClaudeDir();
+  });
+
+  afterEach(() => {
+    fixture.cleanup();
+  });
+
+  it("updates project_path in session-meta files", () => {
+    const metaDir = join(fixture.claudeDir, "usage-data", "session-meta");
+    mkdirSync(metaDir, { recursive: true });
+    writeFileSync(
+      join(metaDir, "s1.json"),
+      JSON.stringify({ project_path: "/old/project", tokens: 100 }),
+      "utf-8"
+    );
+    writeFileSync(
+      join(metaDir, "s2.json"),
+      JSON.stringify({ project_path: "/other/project", tokens: 50 }),
+      "utf-8"
+    );
+
+    const count = updateUsageData(fixture.claudeDir, "/old/project", "/new/project");
+    assert.equal(count, 1);
+
+    const s1 = JSON.parse(readFileSync(join(metaDir, "s1.json"), "utf-8"));
+    assert.equal(s1.project_path, "/new/project");
+
+    const s2 = JSON.parse(readFileSync(join(metaDir, "s2.json"), "utf-8"));
+    assert.equal(s2.project_path, "/other/project");
+  });
+});
