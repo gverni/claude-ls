@@ -4,7 +4,7 @@ import { homedir } from "os";
 import { encodePath } from "./encoder.js";
 
 export function findClaudeDir() {
-  return join(homedir(), ".claude");
+  return process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude");
 }
 
 export function findProjectDir(claudeDir, projectPath) {
