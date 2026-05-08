@@ -73,6 +73,39 @@ export function updateSessionsIndex(indexPath, oldPath, newPath, newEncodedDir, 
   return changed ? 1 : 0;
 }
 
+export function updateClaudeJson(jsonPath, oldPath, newPath, { dryRun = false, verbose = false } = {}) {
+  if (!existsSync(jsonPath)) return 0;
+
+  let data;
+  try {
+    data = JSON.parse(readFileSync(jsonPath, "utf-8"));
+  } catch {
+    return 0;
+  }
+
+  const projects = data.projects;
+  if (!projects || typeof projects !== "object") return 0;
+
+  let keysRenamed = 0;
+  for (const key of Object.keys(projects)) {
+    if (key === oldPath || key.startsWith(oldPath + "/")) {
+      const newKey = newPath + key.slice(oldPath.length);
+      projects[newKey] = projects[key];
+      delete projects[key];
+      keysRenamed++;
+    }
+  }
+
+  if (keysRenamed > 0) {
+    if (verbose) process.stderr.write(`    .claude.json: renamed ${keysRenamed} project key(s)\n`);
+    if (!dryRun) {
+      writeFileSync(jsonPath, JSON.stringify(data, null, 2), "utf-8");
+    }
+  }
+
+  return keysRenamed;
+}
+
 export function updateHistory(historyPath, oldPath, newPath, { dryRun = false, verbose = false } = {}) {
   if (!existsSync(historyPath)) return 0;
   const count = replaceInFile(historyPath, oldPath, newPath, dryRun);

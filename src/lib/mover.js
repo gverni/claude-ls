@@ -2,7 +2,7 @@ import { existsSync, readdirSync, renameSync, cpSync, rmSync } from "fs";
 import { resolve, join } from "path";
 import { encodePath } from "./encoder.js";
 import { findClaudeDir, findProjectDir } from "./scanner.js";
-import { updateHistory, updateSessionsIndex, updateUsageData } from "./updaters.js";
+import { updateClaudeJson, updateHistory, updateSessionsIndex, updateUsageData } from "./updaters.js";
 
 export class MoveError extends Error {
   constructor(message) {
@@ -14,6 +14,7 @@ export class MoveError extends Error {
 class MoveResult {
   constructor() {
     this.projectDirRenamed = false;
+    this.claudeJsonUpdated = 0;
     this.sessionsIndexUpdated = 0;
     this.historyLinesChanged = 0;
     this.usageDataUpdated = 0;
@@ -26,6 +27,9 @@ class MoveResult {
     const lines = [];
     if (this.projectDirRenamed) {
       lines.push(`${prefix}renamed project directory in ~/.claude/projects/`);
+    }
+    if (this.claudeJsonUpdated) {
+      lines.push(`${prefix}updated ${this.claudeJsonUpdated} project key(s) in ~/.claude.json`);
     }
     if (this.sessionsIndexUpdated) {
       lines.push(`${prefix}updated sessions-index.json`);
@@ -75,11 +79,13 @@ function renameAndUpdate(projectDir, newProjectDir, historyPath, oldPath, newPat
 
 function updateDataFiles(projectDir, historyPath, oldPath, newPath, newEncoded, dryRun, result, verbose) {
   const claudeDir = join(historyPath, "..");
+  const claudeJsonPath = join(claudeDir, "..", ".claude.json");
+
+  result.claudeJsonUpdated = updateClaudeJson(claudeJsonPath, oldPath, newPath, { dryRun, verbose });
 
   if (projectDir && existsSync(projectDir)) {
     const indexPath = join(projectDir, "sessions-index.json");
     result.sessionsIndexUpdated = updateSessionsIndex(indexPath, oldPath, newPath, newEncoded, { dryRun, verbose });
-
   }
 
   result.historyLinesChanged = updateHistory(historyPath, oldPath, newPath, { dryRun, verbose });

@@ -15,7 +15,7 @@ This document maps that structure to what `claude-ls` handles. If the official d
 
 | Location | Keyed by | `mv`/`remap` | `inspect` | `search` |
 |----------|----------|--------------|-----------|----------|
-| `~/.claude.json` | - (has `projects` object keyed by path) | **TODO** - needs path key rename | Useful (permissions, MCPs) | - |
+| `~/.claude.json` | - (has `projects` object keyed by path) | **Handled** - project keys renamed | Useful (permissions, MCPs) | - |
 | `~/.claude/settings.json` | - | No path refs | Useful (global vs project comparison) | Searchable |
 | `~/.claude/CLAUDE.md` | - | No path refs | Useful (global instructions) | Searchable |
 | `~/.claude/history.jsonl` | - (lines have `project` field) | **Handled** | - | Searchable |
@@ -156,18 +156,22 @@ Uses `cpSync` + `rmSync` to move `/old/path` to `/new/path`.
 
 If the destination already exists, the command errors out.
 
-### Step 3: Update `sessions-index.json`
+### Step 3: Update `~/.claude.json`
+
+Renames project keys in the `projects` object. Both exact matches and sub-path keys (e.g. `/old/path/sub`) are renamed.
+
+### Step 4: Update `sessions-index.json`
 
 Fields updated:
 - `originalPath`
 - `entries[*].projectPath`
 - `entries[*].fullPath`
 
-### Step 4: Update `history.jsonl`
+### Step 5: Update `history.jsonl`
 
 Each line is parsed as JSON. Any string value that exactly equals the old path or starts with `old_path/` is replaced. This avoids substring corruption (e.g. `/Users/foo` won't match `/Users/foobar`).
 
-### Step 5: Update usage-data
+### Step 6: Update usage-data
 
 Files: `~/.claude/usage-data/session-meta/*.json`. If `project_path` matches the old path (exact or prefix), it's replaced.
 
@@ -199,5 +203,5 @@ When `--dry-run` is passed, all steps compute what would change but write nothin
 
 ## TODO
 
-- [ ] Handle `~/.claude.json` `projects` entry (rename key from old path to new path)
+- [x] Handle `~/.claude.json` `projects` entry (rename key from old path to new path)
 - [x] Respect `CLAUDE_CONFIG_DIR` environment variable in `findClaudeDir()`

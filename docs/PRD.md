@@ -55,6 +55,7 @@ Move a project directory and update all Claude Code internal references.
 
 **What it updates:**
 - Actual project directory on disk
+- `~/.claude.json` - project keys renamed in `projects` object
 - `~/.claude/projects/{encoded}/` directory (renamed)
 - `sessions-index.json` - originalPath, projectPath, fullPath fields
 - `~/.claude/history.jsonl` - project field
