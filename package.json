@@ -1,0 +1,28 @@
+{
+  "name": "claude-ls",
+  "version": "0.1.0",
+  "description": "CLI tool for managing Claude Code projects - list, inspect, move, search, and prune",
+  "type": "module",
+  "bin": {
+    "claude-ls": "./src/cli.js"
+  },
+  "scripts": {
+    "test": "node --test test/**/*.test.js"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "anthropic",
+    "cli",
+    "project",
+    "manager"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "chalk": "^5.6.2",
+    "commander": "^13.0.0"
+  }
+}
