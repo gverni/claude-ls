@@ -53,7 +53,7 @@ describe("list command", () => {
     assert.ok(combined.includes("orphaned"));
   });
 
-  it("marks existing projects", async () => {
+  it("marks existing projects without orphaned label", async () => {
     const realPath = join(fixture.claudeDir, "real-dir");
     mkdirSync(realPath);
     fixture.addProject({
@@ -63,7 +63,8 @@ describe("list command", () => {
 
     await listCommand({ claudeDir: fixture.claudeDir });
     const combined = output.join("\n");
-    assert.ok(combined.includes("✓"));
+    assert.ok(combined.includes(realPath));
+    assert.ok(!combined.includes("orphaned"));
   });
 
   it("outputs JSON with --json flag", async () => {
@@ -89,5 +90,38 @@ describe("list command", () => {
     const combined = output.join("\n");
     assert.ok(combined.includes("/tmp/gone-project"));
     assert.ok(!combined.includes(realPath));
+  });
+
+  it("sorts by most recent with --sort recent", async () => {
+    fixture.addProject({ path: "/tmp/aaa-old", sessions: [{ id: "s1", modified: "2026-01-01T00:00:00" }] });
+    fixture.addProject({ path: "/tmp/zzz-new", sessions: [{ id: "s2", modified: "2026-05-01T00:00:00" }] });
+
+    await listCommand({ claudeDir: fixture.claudeDir, sort: "recent" });
+    const combined = output.join("\n");
+    const posNew = combined.indexOf("/tmp/zzz-new");
+    const posOld = combined.indexOf("/tmp/aaa-old");
+    assert.ok(posNew < posOld, "Most recent project should appear first");
+  });
+
+  it("sorts by oldest with --sort oldest", async () => {
+    fixture.addProject({ path: "/tmp/aaa-old", sessions: [{ id: "s1", modified: "2026-01-01T00:00:00" }] });
+    fixture.addProject({ path: "/tmp/zzz-new", sessions: [{ id: "s2", modified: "2026-05-01T00:00:00" }] });
+
+    await listCommand({ claudeDir: fixture.claudeDir, sort: "oldest" });
+    const combined = output.join("\n");
+    const posOld = combined.indexOf("/tmp/aaa-old");
+    const posNew = combined.indexOf("/tmp/zzz-new");
+    assert.ok(posOld < posNew, "Oldest project should appear first");
+  });
+
+  it("sorts alphabetically by default", async () => {
+    fixture.addProject({ path: "/tmp/zzz-project", sessions: [{ id: "s1", modified: "2026-05-01T00:00:00" }] });
+    fixture.addProject({ path: "/tmp/aaa-project", sessions: [{ id: "s2", modified: "2026-01-01T00:00:00" }] });
+
+    await listCommand({ claudeDir: fixture.claudeDir });
+    const combined = output.join("\n");
+    const posA = combined.indexOf("/tmp/aaa-project");
+    const posZ = combined.indexOf("/tmp/zzz-project");
+    assert.ok(posA < posZ, "Alphabetically first project should appear first");
   });
 });

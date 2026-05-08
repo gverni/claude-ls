@@ -16,7 +16,16 @@ export async function listCommand(opts = {}) {
     exists: existsSync(p.projectPath),
   }));
 
-  const filtered = opts.orphaned ? withStatus.filter((p) => !p.exists) : withStatus;
+  let filtered = opts.orphaned ? withStatus.filter((p) => !p.exists) : withStatus;
+
+  const sort = opts.sort || "alpha";
+  if (sort === "recent") {
+    filtered = [...filtered].sort((a, b) => (b.lastModified || "").localeCompare(a.lastModified || ""));
+  } else if (sort === "oldest") {
+    filtered = [...filtered].sort((a, b) => (a.lastModified || "").localeCompare(b.lastModified || ""));
+  } else {
+    filtered = [...filtered].sort((a, b) => a.projectPath.localeCompare(b.projectPath));
+  }
 
   if (opts.json) {
     console.log(JSON.stringify(filtered.map(({ encodedName, ...rest }) => rest)));
@@ -28,15 +37,14 @@ export async function listCommand(opts = {}) {
     return;
   }
 
-  console.log(chalk.bold(`Claude Code projects in ${claudeDir}/projects/\n`));
-
   for (const p of filtered) {
-    const status = p.exists ? chalk.green(" ✓") : chalk.red.dim(" ✗ orphaned");
+    const dot = p.exists ? chalk.green("●") : chalk.redBright("●");
     let modified = p.lastModified || "unknown";
     if (modified.includes("T")) modified = modified.slice(0, 16).replace("T", " ");
 
-    console.log(`  ${chalk.bold(p.projectPath)}${status}`);
-    console.log(`    ${chalk.dim("sessions:")} ${p.sessionCount}  ${chalk.dim("last active:")} ${modified}`);
+    const label = p.exists ? p.projectPath : `${p.projectPath} (orphaned)`;
+    console.log(`${dot} ${chalk.bold(label)}`);
+    console.log(`  ⎿  sessions: ${p.sessionCount}, last active: ${modified}`);
     console.log();
   }
 
@@ -46,5 +54,5 @@ export async function listCommand(opts = {}) {
   const parts = [`${onDisk} on disk`];
   if (orphaned) parts.push(`${orphaned} orphaned`);
   const label = `${total} project${total !== 1 ? "s" : ""}`;
-  console.log(chalk.dim(`${label} (${parts.join(", ")})`));
+  console.log(chalk.dim(`\n${label} (${parts.join(", ")})`));
 }

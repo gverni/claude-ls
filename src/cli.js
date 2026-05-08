@@ -21,6 +21,7 @@ program
   .description("List all projects tracked by Claude Code")
   .option("--json", "Output as JSON")
   .option("--orphaned", "Show only orphaned projects")
+  .option("--sort <order>", "Sort order: recent, oldest, alpha (default: alpha)", "alpha")
   .option("--claude-dir <path>", "Override Claude data directory")
   .action(async (opts) => {
     const { listCommand } = await import("./commands/list.js");
