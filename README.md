@@ -2,7 +2,7 @@
 
 CLI tool for managing Claude Code projects.
 
-> **Disclaimer**: This is not an official Anthropic tool. The logic has been implemented by reverse-engineering the documentation and the `~/.claude` directory structure. Use at your own risk.
+⚠️ **Disclaimer**: This is not an official Anthropic tool. The logic has been implemented by reverse-engineering the documentation and the `~/.claude` directory structure. Use at your own risk.
 
 ## Why
 
