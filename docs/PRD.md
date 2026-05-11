@@ -57,7 +57,7 @@ Move a project directory and update all Claude Code internal references.
 - Actual project directory on disk
 - `~/.claude.json` - project keys renamed in `projects` object
 - `~/.claude/projects/{encoded}/` directory (renamed)
-- `sessions-index.json` - originalPath, projectPath, fullPath fields
+- `sessions-index.json` - originalPath, projectPath, fullPath fields (legacy file from claudepath, possibly no longer created by recent Claude Code versions)
 - `~/.claude/history.jsonl` - project field
 - `~/.claude/usage-data/session-meta/*.json` - project_path field
 

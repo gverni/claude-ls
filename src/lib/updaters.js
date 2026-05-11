@@ -32,6 +32,8 @@ export function updateUsageData(claudeDir, oldPath, newPath, { dryRun = false, v
   return filesUpdated;
 }
 
+// sessions-index.json: referenced in claudepath Python tool but not in official Claude Code docs.
+// Possibly a legacy file no longer created by recent versions. Handled defensively if present.
 export function updateSessionsIndex(indexPath, oldPath, newPath, newEncodedDir, { dryRun = false, verbose = false } = {}) {
   if (!existsSync(indexPath)) return 0;
 

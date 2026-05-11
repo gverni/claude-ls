@@ -35,10 +35,12 @@ This document maps that structure to what `claude-ls` handles. If the official d
 | Location | Keyed by | `mv`/`remap` | `inspect` | `search` | `list` |
 |----------|----------|--------------|-----------|----------|--------|
 | `~/.claude/projects/{encoded}/` | Encoded path | **Handled** - directory renamed | - | - | Used for discovery |
-| `~/.claude/projects/{encoded}/sessions-index.json` | Encoded path | **Handled** - fields updated | Useful (session count, last active) | - | Used for metadata |
+| `~/.claude/projects/{encoded}/sessions-index.json` | Encoded path | **Handled** - fields updated (see note below) | Useful (session count, last active) | - | Used for metadata |
 | `~/.claude/projects/{encoded}/<session>.jsonl` | Session ID within encoded dir | Not updated (transcripts only) | - | Searchable (with `--sessions`) | - |
 | `~/.claude/projects/{encoded}/<session>/tool-results/` | Session ID within encoded dir | **Handled** - moved with directory rename | - | - | - |
 | `~/.claude/projects/{encoded}/memory/` | Encoded path | **Handled** - moved with directory rename | Useful (project memory) | Searchable | - |
+
+**Note on `sessions-index.json`**: This file was referenced in the [claudepath](https://github.com/Mahiler1909/claudepath) Python tool, but is not mentioned in the official Claude Code documentation. It may be a legacy file from older versions of Claude Code. Our code handles it defensively - updates it if present, falls back to scanning `.jsonl` files if absent.
 
 ### Per-session data (session ID)
 
