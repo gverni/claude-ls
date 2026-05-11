@@ -4,7 +4,6 @@ import { readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
 import { createTestClaudeDir } from "./fixtures.js";
 import {
-  updateSessionsIndex,
   updateHistory,
   updateUsageData,
   updateClaudeJson,
@@ -42,51 +41,7 @@ describe("replacePathValues", () => {
   });
 });
 
-describe("updateSessionsIndex", () => {
-  let fixture;
 
-  beforeEach(() => {
-    fixture = createTestClaudeDir();
-  });
-
-  afterEach(() => {
-    fixture.cleanup();
-  });
-
-  it("updates originalPath, projectPath, and fullPath", () => {
-    const dir = fixture.addProject({
-      path: "/old/project",
-      sessions: [{ id: "s1", modified: "2026-01-01T00:00:00" }],
-    });
-
-    const indexPath = join(dir, "sessions-index.json");
-    const result = updateSessionsIndex(indexPath, "/old/project", "/new/project", "-new-project");
-
-    assert.equal(result, 1);
-    const data = JSON.parse(readFileSync(indexPath, "utf-8"));
-    assert.equal(data.originalPath, "/new/project");
-    assert.equal(data.entries[0].projectPath, "/new/project");
-    assert.ok(data.entries[0].fullPath.includes("-new-project"));
-  });
-
-  it("returns 0 when file does not exist", () => {
-    const result = updateSessionsIndex("/nonexistent/path", "/old", "/new", "-new");
-    assert.equal(result, 0);
-  });
-
-  it("does not write in dry-run mode", () => {
-    const dir = fixture.addProject({
-      path: "/old/project",
-      sessions: [{ id: "s1", modified: "2026-01-01T00:00:00" }],
-    });
-
-    const indexPath = join(dir, "sessions-index.json");
-    const before = readFileSync(indexPath, "utf-8");
-    updateSessionsIndex(indexPath, "/old/project", "/new/project", "-new-project", { dryRun: true });
-    const after = readFileSync(indexPath, "utf-8");
-    assert.equal(before, after);
-  });
-});
 
 describe("updateHistory", () => {
   let fixture;

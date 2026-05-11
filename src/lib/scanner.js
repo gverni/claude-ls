@@ -15,26 +15,6 @@ export function findProjectDir(claudeDir, projectPath) {
   const candidate = join(projectsDir, encoded);
   if (existsSync(candidate)) return candidate;
 
-  const normalized = resolve(projectPath);
-  const entries = readdirSync(projectsDir, { withFileTypes: true });
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-    const indexFile = join(projectsDir, entry.name, "sessions-index.json");
-    if (!existsSync(indexFile)) continue;
-    try {
-      const data = JSON.parse(readFileSync(indexFile, "utf-8"));
-      const original = data.originalPath || "";
-      if (resolve(original) === normalized) return join(projectsDir, entry.name);
-      const indexEntries = data.entries || [];
-      if (indexEntries.length > 0) {
-        const pp = indexEntries[0].projectPath || "";
-        if (resolve(pp) === normalized) return join(projectsDir, entry.name);
-      }
-    } catch {
-      continue;
-    }
-  }
-
   return null;
 }
 
@@ -42,68 +22,101 @@ export function listProjects(claudeDir) {
   const projectsDir = join(claudeDir, "projects");
   if (!existsSync(projectsDir)) return [];
 
+  const claudeJsonPath = join(claudeDir, "..", ".claude.json");
+  const claudeJsonProjects = loadClaudeJsonPaths(claudeJsonPath);
+
+  const projectDirs = readdirSync(projectsDir, { withFileTypes: true })
+    .filter((e) => e.isDirectory())
+    .map((e) => e.name);
+
+  const encodedToMeta = new Map();
+  for (const dirName of projectDirs) {
+    encodedToMeta.set(dirName, getDirectoryMeta(join(projectsDir, dirName)));
+  }
+
   const results = [];
-  const entries = readdirSync(projectsDir, { withFileTypes: true }).sort((a, b) =>
-    a.name.localeCompare(b.name)
-  );
+  const matched = new Set();
 
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-    const entryPath = join(projectsDir, entry.name);
-    let projectPath = null;
-    let lastModified = null;
-    let sessionCount = 0;
+  for (const projectPath of claudeJsonProjects) {
+    const encoded = encodePath(projectPath);
+    const meta = encodedToMeta.get(encoded);
+    const isGit = existsSync(join(projectPath, ".git"));
+    const exists = existsSync(projectPath);
 
-    const indexFile = join(entryPath, "sessions-index.json");
-    if (existsSync(indexFile)) {
-      try {
-        const data = JSON.parse(readFileSync(indexFile, "utf-8"));
-        projectPath = data.originalPath || null;
-        const indexEntries = data.entries || [];
-        if (!projectPath && indexEntries.length > 0) {
-          projectPath = indexEntries[0].projectPath || null;
+    const subfolders = [];
+    if (isGit) {
+      for (const [dirName, dirMeta] of encodedToMeta) {
+        if (dirName === encoded) continue;
+        if (matched.has(dirName)) continue;
+        const cwd = dirMeta.cwd;
+        if (cwd && cwd.startsWith(projectPath + "/")) {
+          subfolders.push({
+            projectPath: cwd,
+            ...dirMeta,
+            exists: existsSync(cwd),
+          });
+          matched.add(dirName);
         }
-        sessionCount = indexEntries.length;
-        if (indexEntries.length > 0) {
-          lastModified = indexEntries.reduce(
-            (max, e) => (e.modified > max ? e.modified : max),
-            ""
-          );
-        }
-      } catch {
-        // ignore
       }
     }
 
-    if (sessionCount === 0) {
-      const jsonlFiles = findJsonlFiles(entryPath);
-      sessionCount = jsonlFiles.length;
-      if (jsonlFiles.length > 0 && !lastModified) {
-        let mostRecent = 0;
-        for (const f of jsonlFiles) {
-          const mtime = statSync(f).mtimeMs;
-          if (mtime > mostRecent) mostRecent = mtime;
-        }
-        lastModified = new Date(mostRecent).toISOString();
-      }
-      if (!projectPath && jsonlFiles.length > 0) {
-        projectPath = readCwdFromJsonl(jsonlFiles[0]);
-      }
-    }
-
-    if (!projectPath) {
-      projectPath = "/" + entry.name.slice(1).replaceAll("-", "/");
-    }
-
+    matched.add(encoded);
     results.push({
-      encodedName: entry.name,
       projectPath,
-      sessionCount,
-      lastModified,
+      sessionCount: meta ? meta.sessionCount : 0,
+      lastModified: meta ? meta.lastModified : null,
+      exists,
+      isGit,
+      subfolders,
+      source: "claude.json",
+    });
+  }
+
+  for (const [dirName, meta] of encodedToMeta) {
+    if (matched.has(dirName)) continue;
+    const projectPath = meta.cwd || ("/" + dirName.slice(1).replaceAll("-", "/"));
+    results.push({
+      projectPath,
+      sessionCount: meta.sessionCount,
+      lastModified: meta.lastModified,
+      exists: existsSync(projectPath),
+      isGit: false,
+      subfolders: [],
+      source: meta.cwd ? "jsonl" : "decoded",
     });
   }
 
   return results;
+}
+
+function getDirectoryMeta(dirPath) {
+  const jsonlFiles = findJsonlFiles(dirPath);
+  let lastModified = null;
+  let mostRecent = 0;
+
+  for (const f of jsonlFiles) {
+    const mtime = statSync(f).mtimeMs;
+    if (mtime > mostRecent) mostRecent = mtime;
+  }
+  if (mostRecent > 0) {
+    lastModified = new Date(mostRecent).toISOString();
+  }
+
+  const cwd = jsonlFiles.length > 0 ? readCwdFromJsonl(jsonlFiles[0]) : null;
+
+  return { sessionCount: jsonlFiles.length, lastModified, cwd };
+}
+
+function loadClaudeJsonPaths(claudeJsonPath) {
+  if (!existsSync(claudeJsonPath)) return [];
+
+  try {
+    const data = JSON.parse(readFileSync(claudeJsonPath, "utf-8"));
+    const projects = data.projects || {};
+    return Object.keys(projects);
+  } catch {
+    return [];
+  }
 }
 
 function findJsonlFiles(dir) {

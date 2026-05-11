@@ -1,6 +1,5 @@
 import { readFileSync, writeFileSync, renameSync, unlinkSync, existsSync, readdirSync } from "fs";
 import { join } from "path";
-import { encodePath } from "./encoder.js";
 
 export function updateUsageData(claudeDir, oldPath, newPath, { dryRun = false, verbose = false } = {}) {
   const metaDir = join(claudeDir, "usage-data", "session-meta");
@@ -32,48 +31,6 @@ export function updateUsageData(claudeDir, oldPath, newPath, { dryRun = false, v
   return filesUpdated;
 }
 
-// sessions-index.json: referenced in claudepath Python tool but not in official Claude Code docs.
-// Possibly a legacy file no longer created by recent versions. Handled defensively if present.
-export function updateSessionsIndex(indexPath, oldPath, newPath, newEncodedDir, { dryRun = false, verbose = false } = {}) {
-  if (!existsSync(indexPath)) return 0;
-
-  let data;
-  try {
-    data = JSON.parse(readFileSync(indexPath, "utf-8"));
-  } catch {
-    return 0;
-  }
-
-  let changed = false;
-  const oldEncoded = encodePath(oldPath);
-
-  if (data.originalPath === oldPath) {
-    data.originalPath = newPath;
-    changed = true;
-  }
-
-  for (const entry of data.entries || []) {
-    if (entry.projectPath === oldPath) {
-      entry.projectPath = newPath;
-      changed = true;
-    }
-    const fullPath = entry.fullPath || "";
-    if (fullPath.includes(oldEncoded)) {
-      entry.fullPath = fullPath.replace(oldEncoded, newEncodedDir);
-      changed = true;
-    }
-  }
-
-  if (verbose && changed) {
-    process.stderr.write(`    sessions-index.json: updated\n`);
-  }
-
-  if (changed && !dryRun) {
-    writeFileSync(indexPath, JSON.stringify(data, null, 2), "utf-8");
-  }
-
-  return changed ? 1 : 0;
-}
 
 export function updateClaudeJson(jsonPath, oldPath, newPath, { dryRun = false, verbose = false } = {}) {
   if (!existsSync(jsonPath)) return 0;

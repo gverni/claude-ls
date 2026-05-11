@@ -5,11 +5,181 @@
 The official Claude Code directory structure is documented at:
 https://code.claude.com/docs/en/claude-directory
 
-This document maps that structure to what `claude-ls` handles. If the official docs change, compare with this document to identify new data locations that may need updating.
+Claude Code stores project data in two main locations:
+
+| Location | What it stores | Keyed by |
+|----------|---------------|----------|
+| `~/.claude.json` | Project permissions, MCP configs, session metrics | Absolute path (git root) |
+| `~/.claude/projects/{encoded}/` | Session transcripts, tool results, memory | Encoded path (exact cwd) |
+| `~/.claude/history.jsonl` | Command history | Line-by-line, each with `project` field |
+| `~/.claude/usage-data/session-meta/*.json` | Token usage, costs | Session ID (file has `project_path`) |
+
+The full data layout with all files and their relevance to each command is in the [Appendix](#appendix-full-data-layout).
 
 ---
 
-## Claude Code data layout (from official docs)
+## Commands
+
+### `list`
+
+`src/commands/list.js` calls `listProjects` in `src/lib/scanner.js`.
+
+**Project discovery:**
+
+1. Read `~/.claude.json` `projects` keys (primary source, authoritative paths)
+2. For each key, look for a matching `~/.claude/projects/{encoded}/` directory to get session count and last active date
+3. Check if the path has a `.git` on disk (used to identify git projects)
+4. Scan remaining `~/.claude/projects/` directories not matched in step 2:
+   - Read `cwd` from the `.jsonl` file to determine the actual path
+   - Last resort: decode directory name (lossy - dashes are ambiguous)
+5. For git projects, group unmatched directories whose `cwd` starts with the project path as subfolders. We do this because Claude Code creates separate `~/.claude/projects/` directories for each subdirectory you run Claude from, but stores a single `.claude.json` entry at the git root. Without grouping, these subfolders would appear as standalone "potentially orphaned" projects.
+
+**Display:**
+
+- Green dot: project exists on disk
+- Red dot + "orphaned": path from `.claude.json` but doesn't exist on disk
+- Red dot + "potentially orphaned": path from `.jsonl`/decoder, doesn't exist on disk
+- `(git)` indicator for git projects
+- Subfolders shown nested under parent
+- "no sessions" in yellow for projects with `.claude.json` entry but no session data
+
+**Flags:** `--sort` (recent/oldest/alpha), `--orphaned`, `--json`, `--claude-dir`
+
+---
+
+### `mv`
+
+`src/commands/mv.js` calls `moveProject` in `src/lib/mover.js`.
+
+Steps:
+
+1. **Move directory on disk** - `cpSync` + `rmSync` from old to new path
+2. **Rename encoded project directory** - `~/.claude/projects/-old-path/` to `~/.claude/projects/-new-path/`. Errors if destination already exists.
+3. **Update `~/.claude.json`** - rename project keys (exact match and sub-path keys)
+4. **Update `history.jsonl`** - replace path in JSON values (exact match or prefix)
+5. **Update usage-data** - replace `project_path` in `session-meta/*.json` files
+
+If any step fails, the directory is copied back (rollback).
+
+**Not updated:** session `.jsonl` files. These are conversation transcripts with no functional impact on Claude Code.
+
+**Flags:** `--dry-run`, `--no-backup`, `--yes`, `--verbose`, `--claude-dir`
+
+---
+
+### `remap`
+
+`src/commands/remap.js` calls `remapProject` in `src/lib/mover.js`.
+
+Same as `mv` but skips step 1 (directory already moved manually). Validates that the new path exists before proceeding.
+
+**Flags:** same as `mv`
+
+---
+
+### `inspect` - not yet implemented
+
+Show project properties (settings, MCPs, CLAUDE.md, memory, sessions).
+
+---
+
+### `search` - not yet implemented
+
+Search across all projects (CLAUDE.md, settings, session content).
+
+---
+
+## Common modules
+
+### `src/lib/encoder.js`
+
+Path encoding: replaces every `/` with `-`.
+
+```
+/Users/gverni/devai/claude-move  ->  -Users-gverni-devai-claude-move
+```
+
+Note: decoding is lossy because dashes in the original path are indistinguishable from encoded slashes.
+
+### `src/lib/scanner.js`
+
+- `findClaudeDir()` - returns `CLAUDE_CONFIG_DIR` env var or `~/.claude`
+- `findProjectDir(claudeDir, path)` - finds encoded project directory for a given path
+- `listProjects(claudeDir)` - discovers all projects using the strategy described in the `list` command section
+
+### `src/lib/updaters.js`
+
+- `updateClaudeJson(path, oldPath, newPath)` - renames project keys in `.claude.json`
+- `updateHistory(historyPath, oldPath, newPath)` - replaces paths in `history.jsonl`
+- `updateUsageData(claudeDir, oldPath, newPath)` - replaces `project_path` in session-meta files
+- `replacePathValues(obj, oldPath, newPath)` - recursive JSON path replacement (exact match or prefix, avoids substring corruption)
+
+### `src/lib/mover.js`
+
+- `moveProject(oldPath, newPath, opts)` - orchestrates full move with rollback
+- `remapProject(oldPath, newPath, opts)` - updates references only (no filesystem move)
+- `previewOperation(oldPath)` - returns what would be affected
+
+---
+
+## Key behaviours
+
+### Git subfolders
+
+Claude Code stores the `.claude.json` key at the **git root** level, but creates `~/.claude/projects/` directories for the **exact cwd**. Running Claude from `/project/src/frontend` when `/project` is the git root creates:
+
+- `.claude.json` key: `/project`
+- `~/.claude/projects/-project-src-frontend/`
+
+The subfolder shares the parent's permissions and MCP configs.
+
+### Git worktrees
+
+Claude follows `gitdir:` back to the main repo and stores the `.claude.json` key under the main repo path. The worktree gets its own `~/.claude/projects/` directory but no `.claude.json` entry.
+
+Worktrees are NOT grouped as subfolders because their path doesn't start with the parent path (e.g. `/stripe/mint-webclipper/` is not a child of `/stripe/mint`).
+
+### Path resolution reliability
+
+| Source | Reliability | When used |
+|--------|-------------|-----------|
+| `~/.claude.json` key | Authoritative | Most projects |
+| `.jsonl` `cwd` field | Correct at session creation, stale after manual moves | Subfolders, worktrees |
+| Decoded directory name | Lossy (dashes ambiguous) | Last resort only |
+
+---
+
+## Implementation log
+
+### Done
+
+- [x] `list` command with project discovery from `.claude.json` and `.jsonl` fallback
+- [x] `mv` command with full move and reference updates
+- [x] `remap` command for already-moved directories
+- [x] `~/.claude.json` project key renaming during move
+- [x] `CLAUDE_CONFIG_DIR` environment variable support
+- [x] Subfolder grouping under git projects
+- [x] Dry-run mode
+- [x] Rollback on failure
+
+### Removed
+
+- `--merge` flag - too dangerous, errors if destination exists instead
+- `.jsonl` file updating during move - transcripts only, no functional impact
+- `sessions-index.json` handling - legacy file from claudepath, not created by current Claude Code
+
+### TODO
+
+- [ ] `inspect` command
+- [ ] `search` command
+- [ ] Warn when moving git worktrees (suggest `git worktree move` + `remap`)
+- [ ] Update `.jsonl` `cwd` fields during move for projects not in `.claude.json`
+
+---
+
+## Appendix: full data layout
+
+Reference from https://code.claude.com/docs/en/claude-directory
 
 ### Global state
 
@@ -35,175 +205,55 @@ This document maps that structure to what `claude-ls` handles. If the official d
 | Location | Keyed by | `mv`/`remap` | `inspect` | `search` | `list` |
 |----------|----------|--------------|-----------|----------|--------|
 | `~/.claude/projects/{encoded}/` | Encoded path | **Handled** - directory renamed | - | - | Used for discovery |
-| `~/.claude/projects/{encoded}/sessions-index.json` | Encoded path | **Handled** - fields updated (see note below) | Useful (session count, last active) | - | Used for metadata |
-| `~/.claude/projects/{encoded}/<session>.jsonl` | Session ID within encoded dir | Not updated (transcripts only) | - | Searchable (with `--sessions`) | - |
-| `~/.claude/projects/{encoded}/<session>/tool-results/` | Session ID within encoded dir | **Handled** - moved with directory rename | - | - | - |
-| `~/.claude/projects/{encoded}/memory/` | Encoded path | **Handled** - moved with directory rename | Useful (project memory) | Searchable | - |
-
-**Note on `sessions-index.json`**: This file was referenced in the [claudepath](https://github.com/Mahiler1909/claudepath) Python tool, but is not mentioned in the official Claude Code documentation. It may be a legacy file from older versions of Claude Code. Our code handles it defensively - updates it if present, falls back to scanning `.jsonl` files if absent.
+| `~/.claude/projects/{encoded}/<session>.jsonl` | Session ID within encoded dir | Not updated (transcripts only) | - | Searchable (with `--sessions`) | `cwd` used as path fallback |
+| `~/.claude/projects/{encoded}/<session>/tool-results/` | Session ID within encoded dir | Moved with directory rename | - | - | - |
+| `~/.claude/projects/{encoded}/memory/` | Encoded path | Moved with directory rename | Useful (project memory) | Searchable | - |
 
 ### Per-session data (session ID)
 
-| Location | Keyed by | `mv`/`remap` | `inspect` | `search` | `list` |
-|----------|----------|--------------|-----------|----------|--------|
-| `~/.claude/file-history/{session}/` | Session ID | No action needed | - | - | - |
-| `~/.claude/tasks/{session}/` | Session ID | No action needed | - | - | - |
-| `~/.claude/debug/` | Session ID | No action needed | - | - | - |
-| `~/.claude/plans/` | Session ID | No action needed | - | - | - |
-| `~/.claude/paste-cache/` | Session ID | No action needed | - | - | - |
-| `~/.claude/image-cache/` | Session ID | No action needed | - | - | - |
-| `~/.claude/session-env/` | Session ID | No action needed | - | - | - |
-| `~/.claude/shell-snapshots/` | Session ID | No action needed | - | - | - |
-| `~/.claude/backups/` | Timestamp | No action needed | - | - | - |
+| Location | Keyed by | `mv`/`remap` |
+|----------|----------|--------------|
+| `~/.claude/file-history/{session}/` | Session ID | No action needed |
+| `~/.claude/tasks/{session}/` | Session ID | No action needed |
+| `~/.claude/debug/` | Session ID | No action needed |
+| `~/.claude/plans/` | Session ID | No action needed |
+| `~/.claude/paste-cache/` | Session ID | No action needed |
+| `~/.claude/image-cache/` | Session ID | No action needed |
+| `~/.claude/session-env/` | Session ID | No action needed |
+| `~/.claude/shell-snapshots/` | Session ID | No action needed |
+| `~/.claude/backups/` | Timestamp | No action needed |
 
 ### Per-session stats
 
-| Location | Keyed by | `mv`/`remap` | `inspect` | `search` | `list` |
-|----------|----------|--------------|-----------|----------|--------|
-| `~/.claude/usage-data/session-meta/*.json` | Session ID (file has `project_path`) | **Handled** - project_path replaced | Useful (cost, token usage) | - | - |
+| Location | Keyed by | `mv`/`remap` |
+|----------|----------|--------------|
+| `~/.claude/usage-data/session-meta/*.json` | Session ID (file has `project_path`) | **Handled** - project_path replaced |
 
 ### Project-level files (in the project directory itself)
 
-These live inside the project directory and move with it during `mv`. They are relevant to `inspect` and `search`.
+These live inside the project directory and move with it during `mv`.
 
-| Location | `mv`/`remap` | `inspect` | `search` |
-|----------|--------------|-----------|----------|
-| `CLAUDE.md` | Moves with project dir | Useful (project instructions) | Searchable |
-| `.mcp.json` | Moves with project dir | Useful (project MCP servers) | Searchable |
-| `.claude/settings.json` | Moves with project dir | Useful (permissions, hooks) | Searchable |
-| `.claude/settings.local.json` | Moves with project dir | Useful (local overrides) | Searchable |
-| `.claude/rules/` | Moves with project dir | Useful (project rules) | Searchable |
-| `.claude/skills/` | Moves with project dir | Useful (project skills) | Searchable |
-| `.claude/commands/` | Moves with project dir | Useful (project commands) | Searchable |
-| `.claude/agents/` | Moves with project dir | Useful (project agents) | Searchable |
-| `.claude/agent-memory/` | Moves with project dir | Useful (project agent memory) | Searchable |
-| `.claude/agent-memory-local/` | Moves with project dir | Useful (local agent memory) | - |
+| Location | `inspect` | `search` |
+|----------|-----------|----------|
+| `CLAUDE.md` | Useful (project instructions) | Searchable |
+| `.mcp.json` | Useful (project MCP servers) | Searchable |
+| `.claude/settings.json` | Useful (permissions, hooks) | Searchable |
+| `.claude/settings.local.json` | Useful (local overrides) | Searchable |
+| `.claude/rules/` | Useful (project rules) | Searchable |
+| `.claude/skills/` | Useful (project skills) | Searchable |
+| `.claude/commands/` | Useful (project commands) | Searchable |
+| `.claude/agents/` | Useful (project agents) | Searchable |
+| `.claude/agent-memory/` | Useful (project agent memory) | Searchable |
+| `.claude/agent-memory-local/` | Useful (local agent memory) | - |
 
 ### Config directory override
 
-The official docs mention `CLAUDE_CONFIG_DIR` environment variable which redirects `~/.claude` entirely. Our `findClaudeDir()` should respect this.
-
-**Status**: not yet handled.
+`CLAUDE_CONFIG_DIR` environment variable redirects `~/.claude` entirely. Supported by `findClaudeDir()`.
 
 ---
 
-## What we learned from
+## References
 
-1. **[claudepath](https://github.com/Mahiler1909/claudepath)** (Python tool by Fernando Chullo) - initial source for the move logic and the data locations it updates
-2. **Inspecting `~/.claude/` directory** - discovered `tasks/`, `debug/`, `file-history/` structure and `~/.claude.json` projects entry
-3. **[`claude project purge` documentation](https://docs.anthropic.com/en/docs/claude-code/cli-reference)** - confirmed which locations are project-scoped
-4. **[Official `~/.claude` directory docs](https://code.claude.com/docs/en/claude-directory)** - complete reference for all data locations and their purpose
-
----
-
-## Path encoding
-
-Claude Code encodes project paths by replacing every `/` with `-`:
-
-```
-/Users/gverni/devai/claude-move  ->  -Users-gverni-devai-claude-move
-```
-
-Implemented in `src/lib/encoder.js`.
-
----
-
-## How we find a project
-
-Used by both `list` and `mv`/`remap`. Implemented in `src/lib/scanner.js`.
-
-### Lookup by encoded path (`findProjectDir`)
-
-1. **Primary**: compute the encoded name from the given path, check if `~/.claude/projects/{encoded}/` exists
-2. **Fallback**: scan all `~/.claude/projects/*/sessions-index.json` files and match by `originalPath` or `entries[0].projectPath`
-
-The fallback handles edge cases where the encoded directory name diverged from the path.
-
-### Listing all projects (`listProjects`)
-
-Iterates all directories in `~/.claude/projects/` and for each:
-
-1. Reads `sessions-index.json` to get `originalPath`, session count, and last modified date
-2. If no sessions-index, counts `.jsonl` files and reads the `cwd` field from the first line
-3. If still no path found, attempts to decode the directory name back to a path
-
----
-
-## `list` command
-
-`src/commands/list.js`
-
-Calls `listProjects` to get all projects with metadata, then:
-
-1. Checks if each project's source directory still exists on disk
-2. Marks as existing (green dot) or orphaned (red dot)
-3. Supports sorting by `recent`, `oldest`, or `alpha` (default)
-4. Supports `--orphaned` filter and `--json` output
-
----
-
-## `mv` command
-
-`src/commands/mv.js` calls `moveProject` in `src/lib/mover.js`.
-
-### Step 1: Move the actual directory on disk
-
-Uses `cpSync` + `rmSync` to move `/old/path` to `/new/path`.
-
-### Step 2: Rename the encoded project directory
-
-```
-~/.claude/projects/-old-path/  ->  ~/.claude/projects/-new-path/
-```
-
-If the destination already exists, the command errors out.
-
-### Step 3: Update `~/.claude.json`
-
-Renames project keys in the `projects` object. Both exact matches and sub-path keys (e.g. `/old/path/sub`) are renamed.
-
-### Step 4: Update `sessions-index.json`
-
-Fields updated:
-- `originalPath`
-- `entries[*].projectPath`
-- `entries[*].fullPath`
-
-### Step 5: Update `history.jsonl`
-
-Each line is parsed as JSON. Any string value that exactly equals the old path or starts with `old_path/` is replaced. This avoids substring corruption (e.g. `/Users/foo` won't match `/Users/foobar`).
-
-### Step 6: Update usage-data
-
-Files: `~/.claude/usage-data/session-meta/*.json`. If `project_path` matches the old path (exact or prefix), it's replaced.
-
-### Not updated: session `.jsonl` files
-
-Session `.jsonl` files are conversation transcripts only. They have no functional impact on Claude Code, so paths inside them are left unchanged.
-
----
-
-## `remap` command
-
-`src/commands/remap.js` calls `remapProject` in `src/lib/mover.js`.
-
-Same as `mv` but skips Step 1 (directory already moved manually). Validates that the new path exists before proceeding.
-
----
-
-## Rollback strategy
-
-If any step fails during `mv`, the directory is copied back from new to old.
-
----
-
-## Dry-run mode
-
-When `--dry-run` is passed, all steps compute what would change but write nothing to disk.
-
----
-
-## TODO
-
-- [x] Handle `~/.claude.json` `projects` entry (rename key from old path to new path)
-- [x] Respect `CLAUDE_CONFIG_DIR` environment variable in `findClaudeDir()`
+1. **[claudepath](https://github.com/Mahiler1909/claudepath)** - Python tool, initial source for move logic
+2. **[Official `~/.claude` directory docs](https://code.claude.com/docs/en/claude-directory)** - complete reference for data locations
+3. **[`claude project purge` docs](https://docs.anthropic.com/en/docs/claude-code/cli-reference)** - confirmed project-scoped locations

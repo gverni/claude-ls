@@ -1,4 +1,3 @@
-import { existsSync } from "fs";
 import chalk from "chalk";
 import { findClaudeDir, listProjects } from "../lib/scanner.js";
 
@@ -11,12 +10,9 @@ export async function listCommand(opts = {}) {
     return;
   }
 
-  const withStatus = projects.map((p) => ({
-    ...p,
-    exists: existsSync(p.projectPath),
-  }));
-
-  let filtered = opts.orphaned ? withStatus.filter((p) => !p.exists) : withStatus;
+  let filtered = opts.orphaned
+    ? projects.filter((p) => !p.exists)
+    : projects;
 
   const sort = opts.sort || "alpha";
   if (sort === "recent") {
@@ -28,7 +24,7 @@ export async function listCommand(opts = {}) {
   }
 
   if (opts.json) {
-    console.log(JSON.stringify(filtered.map(({ encodedName, ...rest }) => rest)));
+    console.log(JSON.stringify(filtered));
     return;
   }
 
@@ -39,20 +35,49 @@ export async function listCommand(opts = {}) {
 
   for (const p of filtered) {
     const dot = p.exists ? chalk.green("●") : chalk.redBright("●");
-    let modified = p.lastModified || "unknown";
-    if (modified.includes("T")) modified = modified.slice(0, 16).replace("T", " ");
+    let modified = formatDate(p.lastModified);
 
-    const label = p.exists ? p.projectPath : `${p.projectPath} (orphaned)`;
+    let label = p.projectPath;
+    if (!p.exists) {
+      label += p.source === "claude.json" ? " (orphaned)" : " (potentially orphaned)";
+    }
+    if (p.isGit) {
+      label += chalk.dim(" (git)");
+    }
+
     console.log(`${dot} ${chalk.bold(label)}`);
-    console.log(`  ⎿  sessions: ${p.sessionCount}, last active: ${modified}`);
+    if (p.sessionCount > 0) {
+      console.log(`  ⎿  sessions: ${p.sessionCount}, last active: ${modified}`);
+    } else {
+      console.log(`  ⎿  ${chalk.yellow("no sessions")}`);
+    }
+
+    for (const sub of p.subfolders || []) {
+      const subDot = sub.exists ? chalk.green("●") : chalk.redBright("●");
+      let subLabel = sub.projectPath;
+      if (!sub.exists) subLabel += " (potentially orphaned)";
+      console.log(`  ⎿  ${subDot} ${subLabel}`);
+      if (sub.sessionCount > 0) {
+        console.log(`     ⎿  sessions: ${sub.sessionCount}, last active: ${formatDate(sub.lastModified)}`);
+      }
+    }
+
     console.log();
   }
 
   const total = filtered.length;
+  const subTotal = filtered.reduce((sum, p) => sum + (p.subfolders || []).length, 0);
   const onDisk = filtered.filter((p) => p.exists).length;
   const orphaned = total - onDisk;
   const parts = [`${onDisk} on disk`];
   if (orphaned) parts.push(`${orphaned} orphaned`);
+  if (subTotal) parts.push(`${subTotal} subfolder${subTotal !== 1 ? "s" : ""}`);
   const label = `${total} project${total !== 1 ? "s" : ""}`;
   console.log(chalk.dim(`\n${label} (${parts.join(", ")})`));
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return "unknown";
+  if (dateStr.includes("T")) return dateStr.slice(0, 16).replace("T", " ");
+  return dateStr;
 }
