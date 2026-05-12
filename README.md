@@ -17,8 +17,13 @@ But it grew from there. `claude-ls` is the project management CLI that Claude Co
 ## Install
 
 ```bash
-npm install -g claude-ls
+git clone https://github.com/gverni/claude-ls.git
+cd claude-ls
+npm install
+npm link
 ```
+
+This makes the `claude-ls` command available globally on your system.
 
 Requires Node.js >= 18.
 
