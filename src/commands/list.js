@@ -62,6 +62,14 @@ export async function listCommand(opts = {}) {
       }
     }
 
+    for (const wt of p.worktrees || []) {
+      const wtDot = chalk.green("●");
+      console.log(`  ⎿  ${wtDot} ${wt.projectPath} ${chalk.dim("(worktree)")}`);
+      if (wt.sessionCount > 0) {
+        console.log(`     ⎿  sessions: ${wt.sessionCount}, last active: ${formatDate(wt.lastModified)}`);
+      }
+    }
+
     console.log();
   }
 

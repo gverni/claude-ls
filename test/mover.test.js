@@ -162,12 +162,16 @@ describe("classifyProject", () => {
   });
 
   it("returns worktree when .git is a file with gitdir:", () => {
+    const repoDir = join(fixture.claudeDir, "..", "main-repo");
+    mkdirSync(join(repoDir, ".git", "worktrees", "wt1"), { recursive: true });
+
     const wtDir = join(fixture.claudeDir, "..", "worktree-dir");
     mkdirSync(wtDir);
-    writeFileSync(join(wtDir, ".git"), "gitdir: /some/repo/.git/worktrees/wt1", "utf-8");
+    writeFileSync(join(wtDir, ".git"), `gitdir: ${repoDir}/.git/worktrees/wt1`, "utf-8");
 
     const result = classifyProject(wtDir, fixture.claudeDir);
     assert.equal(result.type, "worktree");
+    assert.equal(result.parentPath, repoDir);
   });
 
   it("returns untracked when path is not in .claude.json and not a worktree", () => {

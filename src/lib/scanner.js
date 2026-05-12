@@ -1,5 +1,5 @@
 import { readFileSync, readdirSync, statSync, existsSync } from "fs";
-import { join, resolve } from "path";
+import { join, resolve, dirname } from "path";
 import { homedir } from "os";
 import { encodePath } from "./encoder.js";
 
@@ -75,15 +75,39 @@ export function listProjects(claudeDir) {
   for (const [dirName, meta] of encodedToMeta) {
     if (matched.has(dirName)) continue;
     const projectPath = meta.cwd || ("/" + dirName.slice(1).replaceAll("-", "/"));
-    results.push({
-      projectPath,
-      sessionCount: meta.sessionCount,
-      lastModified: meta.lastModified,
-      exists: existsSync(projectPath),
-      isGit: false,
-      subfolders: [],
-      source: meta.cwd ? "jsonl" : "decoded",
-    });
+    const exists = existsSync(projectPath);
+
+    // Check if this is a worktree of an already-listed git project
+    let groupedAsWorktree = false;
+    if (exists) {
+      const parentRepo = resolveWorktreeParent(projectPath);
+      if (parentRepo) {
+        const parentEntry = results.find((r) => r.projectPath === parentRepo);
+        if (parentEntry) {
+          parentEntry.worktrees = parentEntry.worktrees || [];
+          parentEntry.worktrees.push({
+            projectPath,
+            sessionCount: meta.sessionCount,
+            lastModified: meta.lastModified,
+            exists,
+          });
+          groupedAsWorktree = true;
+        }
+      }
+    }
+
+    if (!groupedAsWorktree) {
+      results.push({
+        projectPath,
+        sessionCount: meta.sessionCount,
+        lastModified: meta.lastModified,
+        exists,
+        isGit: false,
+        subfolders: [],
+        source: meta.cwd ? "jsonl" : "decoded",
+      });
+    }
+    matched.add(dirName);
   }
 
   return results;
@@ -132,6 +156,33 @@ function findJsonlFiles(dir) {
     // ignore
   }
   return results;
+}
+
+export function resolveWorktreeParent(dirPath) {
+  // Walk up the directory tree looking for a .git file (worktree marker)
+  let current = dirPath;
+  while (current !== dirname(current)) {
+    const gitPath = join(current, ".git");
+    if (existsSync(gitPath)) {
+      try {
+        const stat = statSync(gitPath);
+        if (stat.isDirectory()) return null; // regular git repo, not a worktree
+        const content = readFileSync(gitPath, "utf-8").trim();
+        if (!content.startsWith("gitdir:")) return null;
+        const gitdir = content.slice("gitdir:".length).trim();
+        const resolved = resolve(current, gitdir);
+        if (resolved.includes("/.git/worktrees/")) {
+          const parentRepo = resolved.split("/.git/worktrees/")[0];
+          return parentRepo;
+        }
+        return null;
+      } catch {
+        return null;
+      }
+    }
+    current = dirname(current);
+  }
+  return null;
 }
 
 function readCwdFromJsonl(jsonlFile) {

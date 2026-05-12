@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, readdirSync, renameSync, cpSync, rmSync } from "fs";
 import { resolve, join } from "path";
 import { encodePath } from "./encoder.js";
-import { findClaudeDir, findProjectDir } from "./scanner.js";
+import { findClaudeDir, findProjectDir, resolveWorktreeParent } from "./scanner.js";
 import { updateClaudeJson, updateHistory, updateJsonlCwd, updateUsageData } from "./updaters.js";
 
 export class MoveError extends Error {
@@ -50,17 +50,6 @@ class MoveResult {
   }
 }
 
-function isGitWorktree(dirPath) {
-  const gitPath = join(dirPath, ".git");
-  if (!existsSync(gitPath)) return false;
-  try {
-    const content = readFileSync(gitPath, "utf-8").trim();
-    return content.startsWith("gitdir:");
-  } catch {
-    return false;
-  }
-}
-
 function loadClaudeJsonKeys(claudeDir) {
   const claudeJsonPath = join(claudeDir, "..", ".claude.json");
   if (!existsSync(claudeJsonPath)) return [];
@@ -87,8 +76,9 @@ export function classifyProject(oldPath, claudeDir = null) {
     return { type: "subfolder", parentPath: parent };
   }
 
-  if (isGitWorktree(oldPath)) {
-    return { type: "worktree", parentPath: null };
+  const worktreeParent = resolveWorktreeParent(oldPath);
+  if (worktreeParent) {
+    return { type: "worktree", parentPath: worktreeParent };
   }
 
   return { type: "untracked", parentPath: null };
