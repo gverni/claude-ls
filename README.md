@@ -79,7 +79,7 @@ claude-ls mv ~/old ~/new --verbose          # Detailed output
 claude-ls mv ~/old ~/new --claude-dir <path>
 ```
 
-**How the move behaves depending on project type:**
+#### Move behaviour by project type
 
 Before moving, `claude-ls mv` classifies the source path and adjusts its behaviour:
 
