@@ -7,6 +7,7 @@ import {
   updateHistory,
   updateUsageData,
   updateClaudeJson,
+  updateJsonlCwd,
   replacePathValues,
 } from "../src/lib/updaters.js";
 
@@ -108,6 +109,75 @@ describe("updateUsageData", () => {
 
     const s2 = JSON.parse(readFileSync(join(metaDir, "s2.json"), "utf-8"));
     assert.equal(s2.project_path, "/other/project");
+  });
+});
+
+describe("updateJsonlCwd", () => {
+  let fixture;
+
+  beforeEach(() => {
+    fixture = createTestClaudeDir();
+  });
+
+  afterEach(() => {
+    fixture.cleanup();
+  });
+
+  it("updates cwd fields in .jsonl files", () => {
+    const projectDir = fixture.addProject({
+      path: "/old/project",
+      sessions: [{
+        id: "s1",
+        content: [
+          JSON.stringify({ type: "human", cwd: "/old/project", message: "hi" }),
+          JSON.stringify({ type: "assistant", cwd: "/old/project", message: "hello" }),
+        ].join("\n"),
+      }],
+    });
+
+    const count = updateJsonlCwd(projectDir, "/old/project", "/new/project");
+    assert.equal(count, 1);
+
+    const content = readFileSync(join(projectDir, "s1.jsonl"), "utf-8");
+    const lines = content.split("\n").filter(Boolean);
+    for (const line of lines) {
+      const obj = JSON.parse(line);
+      assert.equal(obj.cwd, "/new/project");
+    }
+  });
+
+  it("does not update non-cwd fields", () => {
+    const projectDir = fixture.addProject({
+      path: "/old/project",
+      sessions: [{
+        id: "s1",
+        content: JSON.stringify({ type: "human", cwd: "/other/path", message: "/old/project is great" }),
+      }],
+    });
+
+    const count = updateJsonlCwd(projectDir, "/old/project", "/new/project");
+    assert.equal(count, 0);
+  });
+
+  it("returns 0 for non-existent directory", () => {
+    const count = updateJsonlCwd("/nonexistent", "/old", "/new");
+    assert.equal(count, 0);
+  });
+
+  it("does not write in dry-run mode", () => {
+    const projectDir = fixture.addProject({
+      path: "/old/project",
+      sessions: [{
+        id: "s1",
+        content: JSON.stringify({ type: "human", cwd: "/old/project", message: "hi" }),
+      }],
+    });
+
+    const before = readFileSync(join(projectDir, "s1.jsonl"), "utf-8");
+    const count = updateJsonlCwd(projectDir, "/old/project", "/new/project", { dryRun: true });
+    assert.equal(count, 1);
+    const after = readFileSync(join(projectDir, "s1.jsonl"), "utf-8");
+    assert.equal(before, after);
   });
 });
 

@@ -49,19 +49,29 @@ The full data layout with all files and their relevance to each command is in th
 
 ### `mv`
 
-`src/commands/mv.js` calls `moveProject` in `src/lib/mover.js`.
+`src/commands/mv.js` calls `classifyProject` then `moveProject` in `src/lib/mover.js`.
 
-Steps:
+**Classification (before move):**
+
+The command first classifies the source path using `classifyProject`:
+
+1. **tracked** - path is a key in `~/.claude.json`. Proceed normally.
+2. **subfolder** - path is a child of a `~/.claude.json` key (git project). Show warning that permissions/MCP configs won't transfer, ask confirmation. If confirmed, also updates `cwd` fields in session `.jsonl` files.
+3. **worktree** - `.git` file contains `gitdir:`. Refuse with error, suggest `git worktree move` + `claude-ls remap`.
+4. **untracked** - not in `~/.claude.json` and no project directory. Refuse with error.
+
+**Steps (once classified):**
 
 1. **Move directory on disk** - `cpSync` + `rmSync` from old to new path
 2. **Rename encoded project directory** - `~/.claude/projects/-old-path/` to `~/.claude/projects/-new-path/`. Errors if destination already exists.
 3. **Update `~/.claude.json`** - rename project keys (exact match and sub-path keys)
 4. **Update `history.jsonl`** - replace path in JSON values (exact match or prefix)
 5. **Update usage-data** - replace `project_path` in `session-meta/*.json` files
+6. **Update `cwd` in session files** (subfolder case only) - updates `cwd` field in `.jsonl` session files
 
 If any step fails, the directory is copied back (rollback).
 
-**Not updated:** session `.jsonl` files. These are conversation transcripts with no functional impact on Claude Code.
+**Not updated:** session `.jsonl` content (other than `cwd`). These are conversation transcripts with no functional impact on Claude Code.
 
 **Flags:** `--dry-run`, `--no-backup`, `--yes`, `--verbose`, `--claude-dir`
 
@@ -69,9 +79,9 @@ If any step fails, the directory is copied back (rollback).
 
 ### `remap`
 
-`src/commands/remap.js` calls `remapProject` in `src/lib/mover.js`.
+`src/commands/remap.js` calls `classifyProject` then `remapProject` in `src/lib/mover.js`.
 
-Same as `mv` but skips step 1 (directory already moved manually). Validates that the new path exists before proceeding.
+Same classification and handling as `mv`, but skips the filesystem move (directory already moved manually). Validates that the new path exists before proceeding.
 
 **Flags:** same as `mv`
 
@@ -112,10 +122,12 @@ Note: decoding is lossy because dashes in the original path are indistinguishabl
 - `updateClaudeJson(path, oldPath, newPath)` - renames project keys in `.claude.json`
 - `updateHistory(historyPath, oldPath, newPath)` - replaces paths in `history.jsonl`
 - `updateUsageData(claudeDir, oldPath, newPath)` - replaces `project_path` in session-meta files
+- `updateJsonlCwd(projectDir, oldPath, newPath)` - updates only `cwd` fields in session `.jsonl` files (used for subfolder moves)
 - `replacePathValues(obj, oldPath, newPath)` - recursive JSON path replacement (exact match or prefix, avoids substring corruption)
 
 ### `src/lib/mover.js`
 
+- `classifyProject(oldPath, claudeDir)` - returns `{ type, parentPath }` where type is "tracked", "subfolder", "worktree", or "untracked"
 - `moveProject(oldPath, newPath, opts)` - orchestrates full move with rollback
 - `remapProject(oldPath, newPath, opts)` - updates references only (no filesystem move)
 - `previewOperation(oldPath)` - returns what would be affected

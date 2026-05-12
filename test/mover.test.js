@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync, mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { createTestClaudeDir } from "./fixtures.js";
-import { moveProject, remapProject, MoveError } from "../src/lib/mover.js";
+import { moveProject, remapProject, classifyProject, MoveError } from "../src/lib/mover.js";
 
 describe("moveProject", () => {
   let fixture;
@@ -128,5 +128,53 @@ describe("remapProject", () => {
       () => remapProject("/old/path", "/nonexistent/dst", { claudeDir: fixture.claudeDir, noBackup: true }),
       MoveError
     );
+  });
+});
+
+describe("classifyProject", () => {
+  let fixture;
+
+  beforeEach(() => {
+    fixture = createTestClaudeDir();
+  });
+
+  afterEach(() => {
+    fixture.cleanup();
+  });
+
+  it("returns tracked when path is in .claude.json", () => {
+    fixture.addProject({ path: "/projects/myapp", sessions: [{ id: "s1" }] });
+
+    const result = classifyProject("/projects/myapp", fixture.claudeDir);
+    assert.equal(result.type, "tracked");
+    assert.equal(result.parentPath, null);
+  });
+
+  it("returns subfolder when path is child of a .claude.json key", () => {
+    fixture.addProject({ path: "/projects/myapp", sessions: [{ id: "s1" }] });
+
+    const subDir = join(fixture.claudeDir, "..", "sub");
+    mkdirSync(subDir);
+
+    const result = classifyProject("/projects/myapp/src/frontend", fixture.claudeDir);
+    assert.equal(result.type, "subfolder");
+    assert.equal(result.parentPath, "/projects/myapp");
+  });
+
+  it("returns worktree when .git is a file with gitdir:", () => {
+    const wtDir = join(fixture.claudeDir, "..", "worktree-dir");
+    mkdirSync(wtDir);
+    writeFileSync(join(wtDir, ".git"), "gitdir: /some/repo/.git/worktrees/wt1", "utf-8");
+
+    const result = classifyProject(wtDir, fixture.claudeDir);
+    assert.equal(result.type, "worktree");
+  });
+
+  it("returns untracked when path is not in .claude.json and not a worktree", () => {
+    const unknownDir = join(fixture.claudeDir, "..", "unknown-dir");
+    mkdirSync(unknownDir);
+
+    const result = classifyProject(unknownDir, fixture.claudeDir);
+    assert.equal(result.type, "untracked");
   });
 });

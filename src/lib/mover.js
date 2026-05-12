@@ -1,8 +1,8 @@
-import { existsSync, readdirSync, renameSync, cpSync, rmSync } from "fs";
+import { existsSync, readFileSync, readdirSync, renameSync, cpSync, rmSync } from "fs";
 import { resolve, join } from "path";
 import { encodePath } from "./encoder.js";
 import { findClaudeDir, findProjectDir } from "./scanner.js";
-import { updateClaudeJson, updateHistory, updateUsageData } from "./updaters.js";
+import { updateClaudeJson, updateHistory, updateJsonlCwd, updateUsageData } from "./updaters.js";
 
 export class MoveError extends Error {
   constructor(message) {
@@ -17,6 +17,7 @@ class MoveResult {
     this.claudeJsonUpdated = 0;
     this.historyLinesChanged = 0;
     this.usageDataUpdated = 0;
+    this.cwdUpdated = 0;
     this.backupPath = null;
     this.dryRun = false;
   }
@@ -29,6 +30,9 @@ class MoveResult {
     }
     if (this.claudeJsonUpdated) {
       lines.push(`${prefix}updated ${this.claudeJsonUpdated} project key(s) in ~/.claude.json`);
+    }
+    if (this.cwdUpdated) {
+      lines.push(`${prefix}updated cwd in ${this.cwdUpdated} session file(s)`);
     }
     if (this.historyLinesChanged) {
       lines.push(`${prefix}updated ${this.historyLinesChanged} line(s) in history.jsonl`);
@@ -46,6 +50,50 @@ class MoveResult {
   }
 }
 
+function isGitWorktree(dirPath) {
+  const gitPath = join(dirPath, ".git");
+  if (!existsSync(gitPath)) return false;
+  try {
+    const content = readFileSync(gitPath, "utf-8").trim();
+    return content.startsWith("gitdir:");
+  } catch {
+    return false;
+  }
+}
+
+function loadClaudeJsonKeys(claudeDir) {
+  const claudeJsonPath = join(claudeDir, "..", ".claude.json");
+  if (!existsSync(claudeJsonPath)) return [];
+  try {
+    const data = JSON.parse(readFileSync(claudeJsonPath, "utf-8"));
+    return Object.keys(data.projects || {});
+  } catch {
+    return [];
+  }
+}
+
+export function classifyProject(oldPath, claudeDir = null) {
+  if (!claudeDir) claudeDir = findClaudeDir();
+  oldPath = resolve(oldPath);
+
+  const keys = loadClaudeJsonKeys(claudeDir);
+
+  if (keys.includes(oldPath)) {
+    return { type: "tracked", parentPath: null };
+  }
+
+  const parent = keys.find((k) => oldPath.startsWith(k + "/"));
+  if (parent) {
+    return { type: "subfolder", parentPath: parent };
+  }
+
+  if (isGitWorktree(oldPath)) {
+    return { type: "worktree", parentPath: null };
+  }
+
+  return { type: "untracked", parentPath: null };
+}
+
 function findJsonlFilesRecursive(dir) {
   const results = [];
   try {
@@ -58,7 +106,7 @@ function findJsonlFilesRecursive(dir) {
   return results;
 }
 
-function renameAndUpdate(projectDir, newProjectDir, historyPath, oldPath, newPath, dryRun, verbose, result) {
+function renameAndUpdate(projectDir, newProjectDir, historyPath, oldPath, newPath, dryRun, verbose, result, updateCwd = false) {
   if (projectDir && existsSync(projectDir)) {
     if (existsSync(newProjectDir)) {
       throw new MoveError(
@@ -67,6 +115,13 @@ function renameAndUpdate(projectDir, newProjectDir, historyPath, oldPath, newPat
     }
     if (!dryRun) renameSync(projectDir, newProjectDir);
     result.projectDirRenamed = true;
+  }
+
+  if (updateCwd) {
+    const workingDir = existsSync(newProjectDir) ? newProjectDir : projectDir;
+    if (workingDir) {
+      result.cwdUpdated = updateJsonlCwd(workingDir, oldPath, newPath, { dryRun, verbose });
+    }
   }
 
   updateDataFiles(historyPath, oldPath, newPath, dryRun, result, verbose);
@@ -113,7 +168,7 @@ export function previewOperation(oldPath, claudeDir = null) {
   };
 }
 
-export function moveProject(oldPath, newPath, { claudeDir = null, dryRun = false, noBackup = false, verbose = false } = {}) {
+export function moveProject(oldPath, newPath, { claudeDir = null, dryRun = false, noBackup = false, verbose = false, updateCwd = false } = {}) {
   oldPath = resolve(oldPath);
   newPath = resolve(newPath);
 
@@ -137,7 +192,7 @@ export function moveProject(oldPath, newPath, { claudeDir = null, dryRun = false
       rmSync(oldPath, { recursive: true });
     }
 
-    renameAndUpdate(projectDir, newProjectDir, historyPath, oldPath, newPath, dryRun, verbose, result);
+    renameAndUpdate(projectDir, newProjectDir, historyPath, oldPath, newPath, dryRun, verbose, result, updateCwd);
   } catch (e) {
     if (!dryRun && existsSync(newPath) && !existsSync(oldPath)) {
       cpSync(newPath, oldPath, { recursive: true });
@@ -150,7 +205,7 @@ export function moveProject(oldPath, newPath, { claudeDir = null, dryRun = false
   return result;
 }
 
-export function remapProject(oldPath, newPath, { claudeDir = null, dryRun = false, noBackup = false, verbose = false } = {}) {
+export function remapProject(oldPath, newPath, { claudeDir = null, dryRun = false, noBackup = false, verbose = false, updateCwd = false } = {}) {
   oldPath = resolve(oldPath);
   newPath = resolve(newPath);
 

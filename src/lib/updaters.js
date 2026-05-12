@@ -65,6 +65,77 @@ export function updateClaudeJson(jsonPath, oldPath, newPath, { dryRun = false, v
   return keysRenamed;
 }
 
+export function updateJsonlCwd(projectDir, oldPath, newPath, { dryRun = false, verbose = false } = {}) {
+  if (!existsSync(projectDir)) return 0;
+
+  let filesUpdated = 0;
+  const jsonlFiles = findJsonlFilesRecursive(projectDir);
+
+  for (const file of jsonlFiles) {
+    let content;
+    try {
+      content = readFileSync(file, "utf-8");
+    } catch {
+      continue;
+    }
+
+    const lines = content.split("\n");
+    let changed = false;
+    const newLines = [];
+
+    for (const line of lines) {
+      if (!line.trim()) {
+        newLines.push(line);
+        continue;
+      }
+      try {
+        const obj = JSON.parse(line);
+        if (obj.cwd && (obj.cwd === oldPath || obj.cwd.startsWith(oldPath + "/"))) {
+          obj.cwd = newPath + obj.cwd.slice(oldPath.length);
+          newLines.push(JSON.stringify(obj));
+          changed = true;
+        } else {
+          newLines.push(line);
+        }
+      } catch {
+        newLines.push(line);
+      }
+    }
+
+    if (changed) {
+      filesUpdated++;
+      if (verbose) {
+        const rel = file.slice(projectDir.length + 1);
+        process.stderr.write(`    ${rel}: updated cwd\n`);
+      }
+      if (!dryRun) {
+        const tmpPath = file + ".tmp";
+        try {
+          writeFileSync(tmpPath, newLines.join("\n"), "utf-8");
+          renameSync(tmpPath, file);
+        } catch {
+          try { unlinkSync(tmpPath); } catch { /* ignore */ }
+        }
+      }
+    }
+  }
+
+  return filesUpdated;
+}
+
+function findJsonlFilesRecursive(dir) {
+  const results = [];
+  try {
+    const entries = readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) results.push(...findJsonlFilesRecursive(full));
+      else if (entry.name.endsWith(".jsonl")) results.push(full);
+    }
+  } catch { /* ignore */ }
+  return results;
+}
+
 export function updateHistory(historyPath, oldPath, newPath, { dryRun = false, verbose = false } = {}) {
   if (!existsSync(historyPath)) return 0;
   const count = replaceInFile(historyPath, oldPath, newPath, dryRun);
