@@ -31,6 +31,7 @@ export async function mvCommand(oldPath, newPath, opts = {}) {
     console.error(chalk.red("● Error: This directory is a git worktree."));
     console.error("  Claude Code stores worktree data under the main repository.");
     console.error("  Use 'git worktree move' to relocate it, then 'claude-ls remap' to update references.");
+    console.error(chalk.dim("\n  More info: https://github.com/gverni/claude-ls#how-the-move-behaves-depending-on-project-type"));
     process.exit(1);
   }
 
@@ -38,6 +39,7 @@ export async function mvCommand(oldPath, newPath, opts = {}) {
     console.error(chalk.red("● Error: This path is not tracked by Claude Code."));
     console.error("  It has no entry in ~/.claude.json and no project directory in ~/.claude/projects/.");
     console.error("  Tip: run 'claude-ls list' to see tracked projects.");
+    console.error(chalk.dim("\n  More info: https://github.com/gverni/claude-ls#how-the-move-behaves-depending-on-project-type"));
     process.exit(1);
   }
 
@@ -48,7 +50,8 @@ export async function mvCommand(oldPath, newPath, opts = {}) {
     console.log(`  It appears to be a subfolder of ${chalk.bold(classification.parentPath)} (git).`);
     console.log("  Permissions, MCP configs, and approved tools are stored on the parent project");
     console.log("  and will NOT be transferred.\n");
-    console.log(chalk.yellow("  Only proceed if you know what you are doing.\n"));
+    console.log(chalk.yellow("  Only proceed if you know what you are doing."));
+    console.log(chalk.dim("\n  More info: https://github.com/gverni/claude-ls#how-the-move-behaves-depending-on-project-type\n"));
 
     if (!opts.yes && !opts.dryRun) {
       const confirmed = await confirm("Continue anyway?");
