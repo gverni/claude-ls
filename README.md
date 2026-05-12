@@ -42,6 +42,30 @@ claude-ls list --json                 # Output as JSON
 claude-ls list --claude-dir <path>    # Override Claude data directory
 ```
 
+**Example output:**
+
+```
+● ~/projects/my-app (git)
+  ⎿  sessions: 5, last active: 2026-05-10 14:30
+  ⎿  ● ~/projects/my-app/packages/frontend
+     ⎿  sessions: 2, last active: 2026-05-09 11:00
+  ⎿  ● ~/worktrees/my-app-feature (worktree)
+     ⎿  sessions: 1, last active: 2026-05-08 16:45
+
+● ~/projects/scripts
+  ⎿  sessions: 3, last active: 2026-04-20 09:15
+
+● ~/old/deleted-project (orphaned)
+  ⎿  sessions: 2, last active: 2026-03-01 10:00
+```
+
+**Entry types:**
+
+- **Project** - a folder where you've run Claude Code. Can be a standalone directory or a git repo (marked with `(git)`).
+- **Subfolder** - only applies to git repos. Shown indented under the parent project. Claude Code creates a separate session directory for each subdirectory you run it from, but permissions and MCP configs are stored on the git root.
+- **Worktree** - shown indented under the parent repo, marked with `(worktree)`. Git worktrees have their own directory on disk (possibly with a completely different path), but Claude Code tracks them under the main repository.
+- **Orphaned** - marked with `(orphaned)`. The directory no longer exists on disk but Claude still has data for it. Use `claude-ls mv` or clean up manually.
+
 ### `claude-ls mv <old-path> <new-path>`
 
 Move a project directory and update all Claude Code internal references.
@@ -54,6 +78,17 @@ claude-ls mv ~/old ~/new --no-backup        # Skip backup
 claude-ls mv ~/old ~/new --verbose          # Detailed output
 claude-ls mv ~/old ~/new --claude-dir <path>
 ```
+
+**How the move behaves depending on project type:**
+
+Before moving, `claude-ls mv` classifies the source path and adjusts its behaviour:
+
+| Scenario | What happens |
+|----------|-------------|
+| **Tracked project** | The path is in `~/.claude.json`. Moves the directory and updates all Claude Code references. This is the normal case. |
+| **Subfolder of a git project** | The path is a subdirectory of a tracked git repo. Shows a warning: permissions, MCP configs, and approved tools are stored on the parent and will not be transferred. Asks for confirmation before proceeding. |
+| **Git worktree** | Refuses to move. Claude Code stores worktree data under the main repository, so moving the worktree directory alone would break things. Use `git worktree move` instead, then `claude-ls remap` to update references. |
+| **Untracked path** | Refuses to move. The path has no entry in `~/.claude.json` and no session data in `~/.claude/projects/`. There is nothing for Claude Code to update. |
 
 ### `claude-ls remap <old-path> <new-path>`
 
