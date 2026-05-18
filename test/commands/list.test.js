@@ -124,4 +124,21 @@ describe("list command", () => {
     const posZ = combined.indexOf("/tmp/zzz-project");
     assert.ok(posA < posZ, "Alphabetically first project should appear first");
   });
+
+  it("shows source label for non-claude.json projects", async () => {
+    // Add a project with no .claude.json entry so it falls back to jsonl source
+    fixture.addProject({ path: "/tmp/jsonl-only-project", sessions: [{ id: "s1", modified: "2026-01-01T00:00:00", content: JSON.stringify({ type: "human", cwd: "/tmp/jsonl-only-project", message: "hi" }) }] });
+
+    // Remove from .claude.json so the scanner uses jsonl fallback
+    const { writeFileSync, readFileSync } = await import("fs");
+    const { join } = await import("path");
+    const claudeJsonPath = join(fixture.claudeDir, "..", ".claude.json");
+    const data = JSON.parse(readFileSync(claudeJsonPath, "utf-8"));
+    delete data.projects["/tmp/jsonl-only-project"];
+    writeFileSync(claudeJsonPath, JSON.stringify(data, null, 2), "utf-8");
+
+    await listCommand({ claudeDir: fixture.claudeDir });
+    const combined = output.join("\n");
+    assert.ok(combined.includes("[jsonl]"));
+  });
 });

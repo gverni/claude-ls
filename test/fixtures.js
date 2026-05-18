@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, utimesSync 
 import { join } from "path";
 import { tmpdir } from "os";
 import { randomBytes } from "crypto";
+import { encodePath } from "../src/lib/encoder.js";
 
 export function createTestClaudeDir() {
   const base = join(tmpdir(), `claude-ls-test-${randomBytes(4).toString("hex")}`);
@@ -27,7 +28,7 @@ export function createTestClaudeDir() {
     claudeDir,
     projectsDir,
     addProject({ path, sessions = [], lastModified = null }) {
-      const encoded = path.replaceAll("/", "-");
+      const encoded = encodePath(path);
       const dir = join(projectsDir, encoded);
       mkdirSync(dir, { recursive: true });
 

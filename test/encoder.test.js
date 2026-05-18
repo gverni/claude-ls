@@ -24,4 +24,11 @@ describe("encodePath", () => {
       "-Users-foo-my-cool-project"
     );
   });
+
+  it("replaces dots with dashes", () => {
+    assert.equal(
+      encodePath("/Users/gv/dev/gverni.github.io"),
+      "-Users-gv-dev-gverni-github-io"
+    );
+  });
 });

@@ -44,6 +44,9 @@ export async function listCommand(opts = {}) {
     if (p.isGit) {
       label += chalk.dim(" (git)");
     }
+    if (p.source !== "claude.json") {
+      label += chalk.dim(` [${p.source}]`);
+    }
 
     console.log(`${dot} ${chalk.bold(label)}`);
     if (p.sessionCount > 0) {

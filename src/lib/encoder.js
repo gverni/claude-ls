@@ -1,3 +1,3 @@
 export function encodePath(absPath) {
-  return absPath.replaceAll("/", "-");
+  return absPath.replaceAll("/", "-").replaceAll(".", "-");
 }
