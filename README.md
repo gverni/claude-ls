@@ -64,7 +64,12 @@ claude-ls list --claude-dir <path>    # Override Claude data directory
 - **Project** - a folder where you've run Claude Code. Can be a standalone directory or a git repo (marked with `(git)`).
 - **Subfolder** - only applies to git repos. Shown indented under the parent project. Claude Code creates a separate session directory for each subdirectory you run it from, but permissions and MCP configs are stored on the git root.
 - **Worktree** - shown indented under the parent repo, marked with `(worktree)`. Git worktrees have their own directory on disk (possibly with a completely different path), but Claude Code tracks them under the main repository.
-- **Orphaned** - marked with `(orphaned)`. The directory no longer exists on disk but Claude still has data for it. Use `claude-ls mv` or clean up manually.
+- **Orphaned** - marked with `(orphaned)`. The directory no longer exists on disk but Claude still has data for it. Use `claude-ls prune` or `claude project purge` to clean up.
+
+**Source labels** (shown when a project was not found in `~/.claude.json`):
+
+- `[jsonl]` - path was read from a session file's `cwd` field. This happens for git subfolders, worktrees, and any project whose `~/.claude.json` entry is missing.
+- `[decoded]` - path was guessed by decoding the directory name. This is a last resort and is lossy: dashes in the original path are indistinguishable from encoded slashes.
 
 ### `claude-ls mv <old-path> <new-path>`
 
@@ -105,13 +110,39 @@ claude-ls remap ~/old ~/new --verbose
 claude-ls remap ~/old ~/new --claude-dir <path>
 ```
 
+### `claude-ls search <query>`
+
+Search for projects by path name.
+
+```bash
+claude-ls search payment              # Find projects whose path contains "payment"
+claude-ls search --json               # Output as JSON
+claude-ls search --claude-dir <path>  # Override Claude data directory
+```
+
+Search is case-insensitive and includes orphaned projects (no disk access required for path matching).
+
+### `claude-ls prune [path]`
+
+Delete Claude Code data for an orphaned project. Try `claude project purge` first - use this only as a fallback if that command is not available on your system.
+
+```bash
+claude-ls prune ~/old/deleted-project   # Prune a specific orphaned project
+claude-ls prune --all                   # Prune all orphaned projects
+claude-ls prune --all --dry-run         # Preview what would be deleted
+claude-ls prune --all --yes             # Skip confirmation prompt
+claude-ls prune --claude-dir <path>     # Override Claude data directory
+```
+
+Prune removes:
+- The session directory in `~/.claude/projects/`
+- The project entry in `~/.claude.json`
+- Matching lines in `~/.claude/history.jsonl`
+- Matching files in `~/.claude/usage-data/session-meta/`
+
 ### `claude-ls inspect <path>` - coming soon
 
 Show project properties (settings, MCPs, CLAUDE.md, memory, sessions).
-
-### `claude-ls search <query>` - coming soon
-
-Search across all projects (CLAUDE.md, settings, session content).
 
 ## Status
 
@@ -120,8 +151,9 @@ Search across all projects (CLAUDE.md, settings, session content).
 | `list`    | done        |
 | `mv`      | done        |
 | `remap`   | done        |
+| `search`  | done (path search) |
+| `prune`   | done        |
 | `inspect` | coming soon |
-| `search`  | coming soon |
 
 ## Licence
 
