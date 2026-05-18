@@ -67,6 +67,18 @@ program
   });
 
 program
+  .command("prune [path]")
+  .description("Delete Claude data for an orphaned project")
+  .option("--all", "Prune all orphaned projects")
+  .option("--dry-run", "Preview changes without modifying files")
+  .option("--yes, -y", "Skip confirmation prompt")
+  .option("--claude-dir <path>", "Override Claude data directory")
+  .action(async (path, opts) => {
+    const { pruneCommand } = await import("./commands/prune.js");
+    await pruneCommand(path, opts);
+  });
+
+program
   .command("search <query>")
   .description("Search across projects (CLAUDE.md, settings, sessions)")
   .option("--json", "Output as JSON")
