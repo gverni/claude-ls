@@ -70,7 +70,6 @@ program
   .command("search <query>")
   .description("Search across projects (CLAUDE.md, settings, sessions)")
   .option("--json", "Output as JSON")
-  .option("--sessions", "Also search session .jsonl files (slow)")
   .option("--claude-dir <path>", "Override Claude data directory")
   .action(async (query, opts) => {
     const { searchCommand } = await import("./commands/search.js");
