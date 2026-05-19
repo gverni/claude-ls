@@ -228,7 +228,7 @@ Reference from https://code.claude.com/docs/en/claude-directory
 | `~/.claude/file-history/{session}/` | Session ID | No action needed |
 | `~/.claude/tasks/{session}/` | Session ID | No action needed |
 | `~/.claude/debug/` | Session ID | No action needed |
-| `~/.claude/plans/` | Session ID | No action needed |
+| `~/.claude/plans/` | Auto-generated slug (e.g. `my-plan-title.md`) | No action needed - see note below |
 | `~/.claude/paste-cache/` | Session ID | No action needed |
 | `~/.claude/image-cache/` | Session ID | No action needed |
 | `~/.claude/session-env/` | Session ID | No action needed |
@@ -258,6 +258,18 @@ These live inside the project directory and move with it during `mv`.
 | `.claude/agent-memory/` | Useful (project agent memory) | Searchable |
 | `.claude/agent-memory-local/` | Useful (local agent memory) | - |
 
+### Plans and project linking
+
+Plan files (`~/.claude/plans/*.md`) are pure markdown with auto-generated slug filenames. They contain **no structured metadata** (no frontmatter, no session ID, no project path field). The only way to link a plan to a project is to search the file content for the project path.
+
+This means:
+- If a project is moved or renamed, the content-based link breaks.
+- The `inspect` command uses `content.includes(projectPath)` as a best-effort match - this works because the path appears naturally in the plan body wherever it was mentioned.
+
+A feature request exists to add `plansDirectory` support in `settings.json` (per-project plan storage), which would solve this properly: **[GitHub issue #13748](https://github.com/anthropics/claude-code/issues/13748)**. Watch this for future improvement.
+
+A more reliable (but complex) alternative: cross-reference via session files. Session `.jsonl` files record `EnterPlanMode`/`ExitPlanMode` events, so in principle you could find which sessions belong to a project and then determine which plan was created in each session. Not currently implemented.
+
 ### Config directory override
 
 `CLAUDE_CONFIG_DIR` environment variable redirects `~/.claude` entirely. Supported by `findClaudeDir()`.
@@ -269,3 +281,4 @@ These live inside the project directory and move with it during `mv`.
 1. **[claudepath](https://github.com/Mahiler1909/claudepath)** - Python tool, initial source for move logic
 2. **[Official `~/.claude` directory docs](https://code.claude.com/docs/en/claude-directory)** - complete reference for data locations
 3. **[`claude project purge` docs](https://docs.anthropic.com/en/docs/claude-code/cli-reference)** - confirmed project-scoped locations
+4. **[GitHub issue #13748](https://github.com/anthropics/claude-code/issues/13748)** - feature request for `plansDirectory` in `settings.json` (per-project plan storage)

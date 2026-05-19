@@ -129,6 +129,56 @@ describe("inspect command", () => {
     assert.ok("lastInteraction" in parsed.sessions[0]);
   });
 
+  it("shows CLAUDE.md title when file exists", async () => {
+    fixture.addProject({ path: projectDir, sessions: [] });
+    writeFileSync(join(projectDir, "CLAUDE.md"), "# My Project Instructions\n\nSome content.\n", "utf-8");
+
+    await inspectCommand(projectDir, { claudeDir: fixture.claudeDir });
+    const combined = output.join("\n");
+    assert.ok(combined.includes("CLAUDE.md"));
+    assert.ok(combined.includes("My Project Instructions"));
+  });
+
+  it("shows none for CLAUDE.md when file does not exist", async () => {
+    fixture.addProject({ path: projectDir, sessions: [] });
+
+    await inspectCommand(projectDir, { claudeDir: fixture.claudeDir });
+    const combined = output.join("\n");
+    assert.ok(combined.includes("CLAUDE.md"));
+    assert.ok(combined.includes("none"));
+  });
+
+  it("shows plans that reference the project path", async () => {
+    fixture.addProject({ path: projectDir, sessions: [] });
+    const plansDir = join(fixture.claudeDir, "plans");
+    mkdirSync(plansDir, { recursive: true });
+    writeFileSync(
+      join(plansDir, "my-plan.md"),
+      "# Refactor Auth\n\nThis plan is for " + projectDir + " project.\n",
+      "utf-8"
+    );
+    writeFileSync(
+      join(plansDir, "other-plan.md"),
+      "# Other Plan\n\nThis is for /other/project.\n",
+      "utf-8"
+    );
+
+    await inspectCommand(projectDir, { claudeDir: fixture.claudeDir });
+    const combined = output.join("\n");
+    assert.ok(combined.includes("Refactor Auth"));
+    assert.ok(combined.includes("my-plan.md"));
+    assert.ok(!combined.includes("Other Plan"));
+  });
+
+  it("shows plans count of 0 when no plans reference the project", async () => {
+    fixture.addProject({ path: projectDir, sessions: [] });
+
+    await inspectCommand(projectDir, { claudeDir: fixture.claudeDir });
+    const combined = output.join("\n");
+    assert.ok(combined.includes("Plans"));
+    assert.ok(combined.includes("(0)"));
+  });
+
   it("shows orphaned project with data from claude.json", async () => {
     const orphanPath = "/nonexistent/orphan-inspect";
     fixture.addProject({ path: orphanPath, sessions: [] });

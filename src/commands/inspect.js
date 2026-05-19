@@ -81,6 +81,8 @@ function loadProjectData(projectPath, claudeDir) {
   return {
     projectPath,
     exists,
+    claudeMd: loadClaudeMd(projectPath),
+    plans: loadPlans(claudeDir, projectPath),
     sessions: projectDir ? loadSessions(projectDir) : [],
     mcps: {
       global: entry.mcpServers || {},
@@ -93,6 +95,35 @@ function loadProjectData(projectPath, claudeDir) {
       local: localSettings.allowedTools || [],
     },
   };
+}
+
+function loadClaudeMd(projectPath) {
+  const filePath = join(projectPath, "CLAUDE.md");
+  if (!existsSync(filePath)) return null;
+  try {
+    const firstLine = readFileSync(filePath, "utf-8").split("\n").find((l) => l.trim()) || "";
+    return { firstLine: firstLine.replace(/^#+\s*/, "").trim() };
+  } catch {
+    return { firstLine: "" };
+  }
+}
+
+function loadPlans(claudeDir, projectPath) {
+  const plansDir = join(claudeDir, "plans");
+  if (!existsSync(plansDir)) return [];
+  const plans = [];
+  try {
+    for (const file of readdirSync(plansDir).filter((f) => f.endsWith(".md"))) {
+      const filePath = join(plansDir, file);
+      try {
+        const content = readFileSync(filePath, "utf-8");
+        if (!content.includes(projectPath)) continue;
+        const title = content.split("\n").find((l) => l.trim())?.replace(/^#+\s*/, "").trim() || file;
+        plans.push({ file, title });
+      } catch {}
+    }
+  } catch {}
+  return plans;
 }
 
 function loadSessions(projectDir) {
@@ -117,6 +148,26 @@ function display(data) {
   let header = data.projectPath;
   if (!data.exists) header += chalk.dim(" (orphaned)");
   console.log(dot + " " + chalk.bold(header));
+  console.log();
+
+  // CLAUDE.md
+  console.log(chalk.bold("  CLAUDE.md"));
+  if (data.claudeMd) {
+    console.log("  ⎿  " + chalk.dim(data.claudeMd.firstLine || "(no title)"));
+  } else {
+    console.log("  " + chalk.dim("none"));
+  }
+  console.log();
+
+  // Plans
+  console.log(chalk.bold("  Plans") + chalk.dim(" (" + data.plans.length + ")"));
+  if (data.plans.length > 0) {
+    for (const p of data.plans) {
+      console.log("  ⎿  " + p.title + "  " + chalk.dim(p.file));
+    }
+  } else {
+    console.log("  " + chalk.dim("none"));
+  }
   console.log();
 
   // MCPs
