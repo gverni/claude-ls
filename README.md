@@ -127,8 +127,9 @@ Search is case-insensitive and includes orphaned projects (no disk access requir
 Delete Claude Code data for an orphaned project. Try `claude project purge` first - use this only as a fallback if that command is not available on your system.
 
 ```bash
+claude-ls prune                         # Interactive selector (arrow keys + Space)
 claude-ls prune ~/old/deleted-project   # Prune a specific orphaned project
-claude-ls prune --all                   # Prune all orphaned projects
+claude-ls prune --all                   # Prune all orphaned projects (no prompt)
 claude-ls prune --all --dry-run         # Preview what would be deleted
 claude-ls prune --all --yes             # Skip confirmation prompt
 claude-ls prune --claude-dir <path>     # Override Claude data directory

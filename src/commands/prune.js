@@ -3,6 +3,7 @@ import { join, resolve } from "path";
 import { createInterface } from "readline";
 import chalk from "chalk";
 import { findClaudeDir, findProjectDir, listProjects } from "../lib/scanner.js";
+import { interactiveSelect } from "../lib/select.js";
 
 const DISCLAIMER =
   "Try 'claude project purge' first — use this command only as a fallback\n" +
@@ -18,42 +19,63 @@ function confirm(prompt) {
   });
 }
 
+
 export async function pruneCommand(targetPath, opts = {}) {
   const claudeDir = opts.claudeDir || findClaudeDir();
 
   console.log(chalk.yellow("⚠  " + DISCLAIMER));
 
-  if (!targetPath && !opts.all) {
-    console.error(chalk.red("Specify a project path or use --all to prune all orphaned projects."));
-    process.exit(1);
-  }
-
   let targets;
 
   if (opts.all) {
+    const orphaned = getOrphaned(claudeDir);
+    if (orphaned.length === 0) {
+      console.log("No orphaned projects found.");
+      return;
+    }
+    console.log(`Found ${orphaned.length} orphaned project(s):`);
+    for (const t of orphaned) console.log(`  ${chalk.dim(t)}`);
+    console.log();
+    targets = orphaned;
+
+  } else if (targetPath) {
+    const resolved = resolve(targetPath);
+    if (existsSync(resolved)) {
+      console.error(chalk.red("● Error: Directory still exists: " + resolved));
+      console.error("  Only orphaned projects (where the directory no longer exists on disk) can be pruned.");
+      console.error("  Delete the directory first, then run this command.");
+      process.exit(1);
+    }
+    targets = [resolved];
+
+  } else {
+    // Interactive mode
     const projects = listProjects(claudeDir);
     const all = [];
     for (const p of projects) {
       all.push(p);
       for (const sub of p.subfolders || []) all.push(sub);
     }
-    targets = all.filter((p) => !p.exists).map((p) => p.projectPath);
-    if (targets.length === 0) {
+    const orphaned = all.filter((p) => !p.exists);
+
+    if (orphaned.length === 0) {
       console.log("No orphaned projects found.");
       return;
     }
-    console.log(`Found ${targets.length} orphaned project(s):`);
-    for (const t of targets) console.log(`  ${chalk.dim(t)}`);
-    console.log();
-  } else {
-    const resolved = resolve(targetPath);
-    if (existsSync(resolved)) {
-      console.error(chalk.red(`● Error: Directory still exists: ${resolved}`));
-      console.error("  Only orphaned projects (where the directory no longer exists on disk) can be pruned.");
-      console.error("  Delete the directory first, then run this command.");
-      process.exit(1);
+
+    const selected = await interactiveSelect(orphaned, { label: (p) => p.projectPath });
+
+    if (selected === null) {
+      console.log("Aborted.");
+      return;
     }
-    targets = [resolved];
+    if (selected.length === 0) {
+      console.log("Nothing selected.");
+      return;
+    }
+
+    targets = selected;
+    console.log();
   }
 
   if (opts.dryRun) {
@@ -63,26 +85,15 @@ export async function pruneCommand(targetPath, opts = {}) {
   for (const path of targets) {
     const preview = buildPreview(path, claudeDir);
     console.log(chalk.bold(path));
-    if (preview.sessionCount > 0) {
-      console.log(`  ⎿  ${preview.sessionCount} session file(s) in ~/.claude/projects/`);
-    }
-    if (preview.claudeJsonKeys > 0) {
-      console.log(`  ⎿  ${preview.claudeJsonKeys} key(s) in ~/.claude.json`);
-    }
-    if (preview.historyLines > 0) {
-      console.log(`  ⎿  ${preview.historyLines} line(s) in history.jsonl`);
-    }
-    if (preview.usageDataFiles > 0) {
-      console.log(`  ⎿  ${preview.usageDataFiles} usage-data file(s)`);
-    }
+    if (preview.sessionCount > 0)   console.log("  ⎿  " + preview.sessionCount + " session file(s) in ~/.claude/projects/");
+    if (preview.claudeJsonKeys > 0) console.log("  ⎿  " + preview.claudeJsonKeys + " key(s) in ~/.claude.json");
+    if (preview.historyLines > 0)   console.log("  ⎿  " + preview.historyLines + " line(s) in history.jsonl");
+    if (preview.usageDataFiles > 0) console.log("  ⎿  " + preview.usageDataFiles + " usage-data file(s)");
   }
   console.log();
 
   if (!opts.dryRun && !opts.yes) {
-    const msg =
-      targets.length === 1
-        ? "Prune this project?"
-        : `Prune all ${targets.length} orphaned projects?`;
+    const msg = targets.length === 1 ? "Prune this project?" : "Prune all " + targets.length + " projects?";
     const confirmed = await confirm(msg);
     if (!confirmed) {
       console.log("Aborted.");
@@ -91,31 +102,37 @@ export async function pruneCommand(targetPath, opts = {}) {
   }
 
   if (!opts.dryRun) {
-    for (const path of targets) {
-      pruneOne(path, claudeDir);
-    }
+    for (const path of targets) pruneOne(path, claudeDir);
     console.log(chalk.green.bold("● Done!"));
   }
 }
 
+// --- Helpers ---
+
+function getOrphaned(claudeDir) {
+  const projects = listProjects(claudeDir);
+  const all = [];
+  for (const p of projects) {
+    all.push(p);
+    for (const sub of p.subfolders || []) all.push(sub);
+  }
+  return all.filter((p) => !p.exists).map((p) => p.projectPath);
+}
+
 function buildPreview(targetPath, claudeDir) {
   const projectDir = findProjectDir(claudeDir, targetPath);
-  const claudeJsonPath = join(claudeDir, "..", ".claude.json");
-  const historyPath = join(claudeDir, "history.jsonl");
   return {
     projectDir,
     sessionCount: projectDir ? countJsonlFiles(projectDir) : 0,
-    claudeJsonKeys: countClaudeJsonKeys(claudeJsonPath, targetPath),
-    historyLines: countHistoryLines(historyPath, targetPath),
+    claudeJsonKeys: countClaudeJsonKeys(join(claudeDir, "..", ".claude.json"), targetPath),
+    historyLines: countHistoryLines(join(claudeDir, "history.jsonl"), targetPath),
     usageDataFiles: countUsageDataFiles(claudeDir, targetPath),
   };
 }
 
 function pruneOne(targetPath, claudeDir) {
   const projectDir = findProjectDir(claudeDir, targetPath);
-  if (projectDir && existsSync(projectDir)) {
-    rmSync(projectDir, { recursive: true });
-  }
+  if (projectDir && existsSync(projectDir)) rmSync(projectDir, { recursive: true });
   deleteFromClaudeJson(join(claudeDir, "..", ".claude.json"), targetPath);
   deleteFromHistory(join(claudeDir, "history.jsonl"), targetPath);
   deleteFromUsageData(claudeDir, targetPath);
@@ -139,28 +156,20 @@ function countClaudeJsonKeys(jsonPath, targetPath) {
   try {
     const projects = JSON.parse(readFileSync(jsonPath, "utf-8")).projects || {};
     return Object.keys(projects).filter((k) => k === targetPath || k.startsWith(targetPath + "/")).length;
-  } catch {
-    return 0;
-  }
+  } catch { return 0; }
 }
 
 function countHistoryLines(historyPath, targetPath) {
   if (!existsSync(historyPath)) return 0;
   try {
-    return readFileSync(historyPath, "utf-8")
-      .split("\n")
-      .filter((line) => {
-        if (!line.trim()) return false;
-        try {
-          const p = JSON.parse(line).project || "";
-          return p === targetPath || p.startsWith(targetPath + "/");
-        } catch {
-          return false;
-        }
-      }).length;
-  } catch {
-    return 0;
-  }
+    return readFileSync(historyPath, "utf-8").split("\n").filter((line) => {
+      if (!line.trim()) return false;
+      try {
+        const p = JSON.parse(line).project || "";
+        return p === targetPath || p.startsWith(targetPath + "/");
+      } catch { return false; }
+    }).length;
+  } catch { return 0; }
 }
 
 function countUsageDataFiles(claudeDir, targetPath) {
@@ -199,17 +208,13 @@ function deleteFromClaudeJson(jsonPath, targetPath) {
 function deleteFromHistory(historyPath, targetPath) {
   if (!existsSync(historyPath)) return;
   try {
-    const kept = readFileSync(historyPath, "utf-8")
-      .split("\n")
-      .filter((line) => {
-        if (!line.trim()) return true;
-        try {
-          const p = JSON.parse(line).project || "";
-          return !(p === targetPath || p.startsWith(targetPath + "/"));
-        } catch {
-          return true;
-        }
-      });
+    const kept = readFileSync(historyPath, "utf-8").split("\n").filter((line) => {
+      if (!line.trim()) return true;
+      try {
+        const p = JSON.parse(line).project || "";
+        return !(p === targetPath || p.startsWith(targetPath + "/"));
+      } catch { return true; }
+    });
     writeFileSync(historyPath, kept.join("\n"), "utf-8");
   } catch {}
 }
