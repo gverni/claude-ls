@@ -29,7 +29,7 @@ program
   });
 
 program
-  .command("inspect <path>")
+  .command("inspect [path]")
   .description("Show project properties (settings, MCPs, CLAUDE.md, sessions)")
   .option("--json", "Output as JSON")
   .option("--section <name>", "Show only one section (settings, mcps, memory, claudemd, sessions)")
