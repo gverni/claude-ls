@@ -22,7 +22,7 @@ function confirm(prompt) {
 
 export async function pruneCommand(targetPath, opts = {}) {
   const claudeDir = opts.claudeDir || findClaudeDir();
-
+  
   console.log(chalk.yellow("⚠  " + DISCLAIMER));
 
   let targets;
@@ -74,7 +74,7 @@ export async function pruneCommand(targetPath, opts = {}) {
       return;
     }
 
-    targets = selected;
+    targets = selected.map((p) => p.projectPath);
     console.log();
   }
 
