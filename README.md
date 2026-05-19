@@ -12,7 +12,7 @@ Normally you'd just `mv` the folder. But Claude Code stores session history, per
 
 `claude-ls` was born to fix this. It moves your project directory and updates all the internal references, so you keep your full context and chat history intact.
 
-But it grew from there. `claude-ls` is the project management CLI that Claude Code doesn't have yet: list your projects, inspect their settings, search across them.
+But it grew from there. `claude-ls` is the project management CLI that Claude Code doesn't have yet: list your projects, inspect their settings, search across them, and clean up what's left behind.
 
 ## Install
 
@@ -49,14 +49,15 @@ claude-ls list --claude-dir <path>    # Override Claude data directory
   ⎿  sessions: 5, last active: 2026-05-10 14:30
   ⎿  ● ~/projects/my-app/packages/frontend
      ⎿  sessions: 2, last active: 2026-05-09 11:00
-  ⎿  ● ~/worktrees/my-app-feature (worktree)
-     ⎿  sessions: 1, last active: 2026-05-08 16:45
 
 ● ~/projects/scripts
   ⎿  sessions: 3, last active: 2026-04-20 09:15
 
 ● ~/old/deleted-project (orphaned)
   ⎿  sessions: 2, last active: 2026-03-01 10:00
+
+● ~/dev/some-project [jsonl]
+  ⎿  sessions: 1, last active: 2026-02-10 08:00
 ```
 
 **Entry types:**
@@ -70,6 +71,44 @@ claude-ls list --claude-dir <path>    # Override Claude data directory
 
 - `[jsonl]` - path was read from a session file's `cwd` field. This happens for git subfolders, worktrees, and any project whose `~/.claude.json` entry is missing.
 - `[decoded]` - path was guessed by decoding the directory name. This is a last resort and is lossy: dashes in the original path are indistinguishable from encoded slashes.
+
+### `claude-ls inspect [path]`
+
+Show project properties: MCPs, allowed tools, sessions, CLAUDE.md, and plans.
+
+```bash
+claude-ls inspect                     # Interactive project picker
+claude-ls inspect ~/projects/my-app   # Inspect a specific project
+claude-ls inspect --json              # Output as JSON
+claude-ls inspect --claude-dir <path>
+```
+
+**Example output:**
+
+```
+● /Users/gv/dev/my-app (git)
+
+  CLAUDE.md
+  ⎿  My App - Development Guide
+
+  Plans (1)
+  ⎿  Refactor auth layer  refactor-auth-layer.md
+
+  MCPs
+  ⎿  github  npx -y @modelcontextprotocol/server-github  (global)
+  ⎿  local-tools  node ./mcp/server.js  (.mcp.json)
+
+  Allowed tools
+  ⎿  Bash, Read, Edit, Write  (global)
+  ⎿  Bash(npm run *)  (settings.json)
+
+  Sessions (3)
+  ⎿  a1b2c3d4  created: 2026-05-01 09:00  last: 2026-05-10 14:30
+  ⎿  e5f6g7h8  created: 2026-04-15 11:00  last: 2026-04-20 17:45
+  ⎿  i9j0k1l2  created: 2026-03-01 10:00  last: 2026-03-01 10:00
+```
+
+Plans are matched by searching their content for the project path. This is a best-effort link - see [implementation notes](docs/implementation.md#plans-and-project-linking) for details.
 
 ### `claude-ls mv <old-path> <new-path>`
 
@@ -117,22 +156,22 @@ Search for projects by path name.
 ```bash
 claude-ls search payment              # Find projects whose path contains "payment"
 claude-ls search --json               # Output as JSON
-claude-ls search --claude-dir <path>  # Override Claude data directory
+claude-ls search --claude-dir <path>
 ```
 
-Search is case-insensitive and includes orphaned projects (no disk access required for path matching).
+Search is case-insensitive and includes orphaned projects.
 
 ### `claude-ls prune [path]`
 
 Delete Claude Code data for an orphaned project. Try `claude project purge` first - use this only as a fallback if that command is not available on your system.
 
 ```bash
-claude-ls prune                         # Interactive selector (arrow keys + Space)
+claude-ls prune                         # Interactive picker (scrollable, multi-select)
 claude-ls prune ~/old/deleted-project   # Prune a specific orphaned project
 claude-ls prune --all                   # Prune all orphaned projects (no prompt)
 claude-ls prune --all --dry-run         # Preview what would be deleted
 claude-ls prune --all --yes             # Skip confirmation prompt
-claude-ls prune --claude-dir <path>     # Override Claude data directory
+claude-ls prune --claude-dir <path>
 ```
 
 Prune removes:
@@ -141,20 +180,16 @@ Prune removes:
 - Matching lines in `~/.claude/history.jsonl`
 - Matching files in `~/.claude/usage-data/session-meta/`
 
-### `claude-ls inspect <path>` - coming soon
-
-Show project properties (settings, MCPs, CLAUDE.md, memory, sessions).
-
 ## Status
 
-| Command   | Status      |
-|-----------|-------------|
-| `list`    | done        |
-| `mv`      | done        |
-| `remap`   | done        |
+| Command   | Status |
+|-----------|--------|
+| `list`    | done |
+| `mv`      | done |
+| `remap`   | done |
+| `inspect` | done |
 | `search`  | done (path search) |
-| `prune`   | done        |
-| `inspect` | coming soon |
+| `prune`   | done |
 
 ## Licence
 

@@ -42,6 +42,7 @@ The full data layout with all files and their relevance to each command is in th
 - `(git)` indicator for git projects
 - Subfolders shown nested under parent
 - "no sessions" in yellow for projects with `.claude.json` entry but no session data
+- `[jsonl]` or `[decoded]` label when a project was not found in `~/.claude.json`
 
 **Flags:** `--sort` (recent/oldest/alpha), `--orphaned`, `--json`, `--claude-dir`
 
@@ -87,15 +88,56 @@ Same classification and handling as `mv`, but skips the filesystem move (directo
 
 ---
 
-### `inspect` - not yet implemented
+### `inspect`
 
-Show project properties (settings, MCPs, CLAUDE.md, memory, sessions).
+`src/commands/inspect.js` loads project data from multiple sources and displays it.
+
+If no path is given, shows an interactive single-select picker (via `src/lib/select.js`) listing all projects including orphans.
+
+**Data sources:**
+
+| Source | What it provides |
+|--------|-----------------|
+| `~/.claude.json` entry | MCP servers (global), allowed tools |
+| `<project>/.mcp.json` | MCP servers (project-level) |
+| `<project>/.claude/settings.json` | Allowed tools (project-level) |
+| `<project>/.claude/settings.local.json` | Allowed tools (local overrides) |
+| `~/.claude/projects/{encoded}/*.jsonl` | Session list with created/last interaction timestamps |
+| `<project>/CLAUDE.md` | First heading shown as title |
+| `~/.claude/plans/*.md` | Plans whose content contains the project path |
+
+**Display sections:** CLAUDE.md, Plans, MCPs, Allowed tools, Sessions
+
+**Flags:** `--json`, `--claude-dir`
 
 ---
 
-### `search` - not yet implemented
+### `search`
 
-Search across all projects (CLAUDE.md, settings, session content).
+`src/commands/search.js` matches projects by path name.
+
+Searches all projects (including orphans, including subfolders) for the query string in the project path. Case-insensitive. No file content search - path only.
+
+**Flags:** `--json`, `--claude-dir`
+
+---
+
+### `prune`
+
+`src/commands/prune.js` deletes Claude Code data for orphaned projects.
+
+If no path and no `--all` flag, shows an interactive multi-select picker (via `src/lib/select.js`) of all orphaned projects.
+
+**What it deletes:**
+
+1. `~/.claude/projects/{encoded}/` directory
+2. Project key(s) from `~/.claude.json`
+3. Matching lines from `~/.claude/history.jsonl`
+4. Matching files from `~/.claude/usage-data/session-meta/`
+
+Shows a disclaimer to try `claude project purge` first, and a preview of what will be deleted before prompting for confirmation.
+
+**Flags:** `--all`, `--dry-run`, `--yes`, `--claude-dir`
 
 ---
 
@@ -103,13 +145,14 @@ Search across all projects (CLAUDE.md, settings, session content).
 
 ### `src/lib/encoder.js`
 
-Path encoding: replaces every `/` with `-`.
+Path encoding: replaces `/` and `.` with `-`.
 
 ```
 /Users/gverni/devai/claude-move  ->  -Users-gverni-devai-claude-move
+/Users/gv/dev/gverni.github.io   ->  -Users-gv-dev-gverni-github-io
 ```
 
-Note: decoding is lossy because dashes in the original path are indistinguishable from encoded slashes.
+Note: decoding is lossy because dashes in the original path are indistinguishable from encoded slashes or dots. This matches Claude Code's actual encoding behaviour (confirmed by inspecting `~/.claude/projects/` directory names).
 
 ### `src/lib/scanner.js`
 
@@ -131,6 +174,12 @@ Note: decoding is lossy because dashes in the original path are indistinguishabl
 - `moveProject(oldPath, newPath, opts)` - orchestrates full move with rollback
 - `remapProject(oldPath, newPath, opts)` - updates references only (no filesystem move)
 - `previewOperation(oldPath)` - returns what would be affected
+
+### `src/lib/select.js`
+
+Interactive terminal selector backed by `@clack/prompts`. Handles large lists with scrolling.
+
+- `interactiveSelect(items, { label, multi, message })` - shows a scrollable list. Returns selected item(s) or `null` if aborted. `multi: true` (default) for multi-select with Space, `multi: false` for single-select.
 
 ---
 
@@ -168,11 +217,17 @@ Worktrees are NOT grouped as subfolders because their path doesn't start with th
 - [x] `list` command with project discovery from `.claude.json` and `.jsonl` fallback
 - [x] `mv` command with full move and reference updates
 - [x] `remap` command for already-moved directories
+- [x] `inspect` command - MCPs, tools, sessions, CLAUDE.md, plans
+- [x] `search` command - path-based search across all projects
+- [x] `prune` command - interactive multi-select, `--all`, `--dry-run`
 - [x] `~/.claude.json` project key renaming during move
 - [x] `CLAUDE_CONFIG_DIR` environment variable support
 - [x] Subfolder grouping under git projects
 - [x] Dry-run mode
 - [x] Rollback on failure
+- [x] `[jsonl]` / `[decoded]` source labels in `list` output
+- [x] Encoder fix: dots encoded as dashes (matches Claude Code's actual behaviour)
+- [x] Interactive selector via `@clack/prompts` (scrollable, used by `prune` and `inspect`)
 
 ### Removed
 
@@ -182,10 +237,10 @@ Worktrees are NOT grouped as subfolders because their path doesn't start with th
 
 ### TODO
 
-- [ ] `inspect` command
-- [ ] `search` command
 - [ ] Warn when moving git worktrees (suggest `git worktree move` + `remap`)
 - [ ] Update `.jsonl` `cwd` fields during move for projects not in `.claude.json`
+- [ ] `search` content search (CLAUDE.md, settings, sessions) - currently path-only
+- [ ] `inspect --section` flag to show one section at a time
 
 ---
 
@@ -197,29 +252,30 @@ Reference from https://code.claude.com/docs/en/claude-directory
 
 | Location | Keyed by | `mv`/`remap` | `inspect` | `search` |
 |----------|----------|--------------|-----------|----------|
-| `~/.claude.json` | - (has `projects` object keyed by path) | **Handled** - project keys renamed | Useful (permissions, MCPs) | - |
-| `~/.claude/settings.json` | - | No path refs | Useful (global vs project comparison) | Searchable |
-| `~/.claude/CLAUDE.md` | - | No path refs | Useful (global instructions) | Searchable |
-| `~/.claude/history.jsonl` | - (lines have `project` field) | **Handled** | - | Searchable |
+| `~/.claude.json` | - (has `projects` object keyed by path) | **Handled** - project keys renamed | **Used** - MCPs, allowed tools | - |
+| `~/.claude/settings.json` | - | No path refs | - | - |
+| `~/.claude/CLAUDE.md` | - | No path refs | - | - |
+| `~/.claude/history.jsonl` | - (lines have `project` field) | **Handled** | - | - |
 | `~/.claude/stats-cache.json` | - | No path refs | - | - |
 | `~/.claude/keybindings.json` | - | No path refs | - | - |
-| `~/.claude/plugins/` | - | No path refs | Useful (installed plugins) | - |
+| `~/.claude/plugins/` | - | No path refs | - | - |
 | `~/.claude/themes/` | - | No path refs | - | - |
-| `~/.claude/rules/` | - | No path refs | Useful (global rules) | Searchable |
-| `~/.claude/skills/` | - | No path refs | Useful (global skills) | Searchable |
-| `~/.claude/commands/` | - | No path refs | Useful (global commands) | Searchable |
+| `~/.claude/rules/` | - | No path refs | - | - |
+| `~/.claude/skills/` | - | No path refs | - | - |
+| `~/.claude/commands/` | - | No path refs | - | - |
 | `~/.claude/output-styles/` | - | No path refs | - | - |
-| `~/.claude/agents/` | - | No path refs | Useful (global agents) | Searchable |
-| `~/.claude/agent-memory/` | - | No path refs | Useful (global memory) | Searchable |
+| `~/.claude/agents/` | - | No path refs | - | - |
+| `~/.claude/agent-memory/` | - | No path refs | - | - |
+| `~/.claude/plans/` | Slug | No path refs | **Used** - matched by content | - |
 
 ### Per-project data (encoded path)
 
 | Location | Keyed by | `mv`/`remap` | `inspect` | `search` | `list` |
 |----------|----------|--------------|-----------|----------|--------|
 | `~/.claude/projects/{encoded}/` | Encoded path | **Handled** - directory renamed | - | - | Used for discovery |
-| `~/.claude/projects/{encoded}/<session>.jsonl` | Session ID within encoded dir | Not updated (transcripts only) | - | Searchable (with `--sessions`) | `cwd` used as path fallback |
+| `~/.claude/projects/{encoded}/<session>.jsonl` | Session ID within encoded dir | Not updated (transcripts only) | **Used** - session list | - | `cwd` used as path fallback |
 | `~/.claude/projects/{encoded}/<session>/tool-results/` | Session ID within encoded dir | Moved with directory rename | - | - | - |
-| `~/.claude/projects/{encoded}/memory/` | Encoded path | Moved with directory rename | Useful (project memory) | Searchable | - |
+| `~/.claude/projects/{encoded}/memory/` | Encoded path | Moved with directory rename | - | - | - |
 
 ### Per-session data (session ID)
 
@@ -228,7 +284,6 @@ Reference from https://code.claude.com/docs/en/claude-directory
 | `~/.claude/file-history/{session}/` | Session ID | No action needed |
 | `~/.claude/tasks/{session}/` | Session ID | No action needed |
 | `~/.claude/debug/` | Session ID | No action needed |
-| `~/.claude/plans/` | Auto-generated slug (e.g. `my-plan-title.md`) | No action needed - see note below |
 | `~/.claude/paste-cache/` | Session ID | No action needed |
 | `~/.claude/image-cache/` | Session ID | No action needed |
 | `~/.claude/session-env/` | Session ID | No action needed |
@@ -247,16 +302,16 @@ These live inside the project directory and move with it during `mv`.
 
 | Location | `inspect` | `search` |
 |----------|-----------|----------|
-| `CLAUDE.md` | Useful (project instructions) | Searchable |
-| `.mcp.json` | Useful (project MCP servers) | Searchable |
-| `.claude/settings.json` | Useful (permissions, hooks) | Searchable |
-| `.claude/settings.local.json` | Useful (local overrides) | Searchable |
-| `.claude/rules/` | Useful (project rules) | Searchable |
-| `.claude/skills/` | Useful (project skills) | Searchable |
-| `.claude/commands/` | Useful (project commands) | Searchable |
-| `.claude/agents/` | Useful (project agents) | Searchable |
-| `.claude/agent-memory/` | Useful (project agent memory) | Searchable |
-| `.claude/agent-memory-local/` | Useful (local agent memory) | - |
+| `CLAUDE.md` | **Used** - first heading shown as title | - |
+| `.mcp.json` | **Used** - project MCP servers | - |
+| `.claude/settings.json` | **Used** - allowed tools | - |
+| `.claude/settings.local.json` | **Used** - local tool overrides | - |
+| `.claude/rules/` | - | - |
+| `.claude/skills/` | - | - |
+| `.claude/commands/` | - | - |
+| `.claude/agents/` | - | - |
+| `.claude/agent-memory/` | - | - |
+| `.claude/agent-memory-local/` | - | - |
 
 ### Plans and project linking
 
