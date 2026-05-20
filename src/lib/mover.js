@@ -3,6 +3,7 @@ import { resolve, join } from "path";
 import { encodePath } from "./encoder.js";
 import { findClaudeDir, findProjectDir, resolveWorktreeParent } from "./scanner.js";
 import { updateClaudeJson, updateHistory, updateJsonlCwd, updateUsageData } from "./updaters.js";
+import { createBackup } from "./backup.js";
 
 export class MoveError extends Error {
   constructor(message) {
@@ -175,6 +176,10 @@ export function moveProject(oldPath, newPath, { claudeDir = null, dryRun = false
 
   const { result, projectDir, newProjectDir, historyPath } = prepareOperation(oldPath, newPath, claudeDir, dryRun, noBackup, verbose);
 
+  if (!dryRun && !noBackup) {
+    result.backupPath = createBackup(join(historyPath, ".."), projectDir);
+  }
+
   try {
     if (!dryRun) {
       if (existsSync(newPath)) rmSync(newPath, { recursive: true });
@@ -207,6 +212,10 @@ export function remapProject(oldPath, newPath, { claudeDir = null, dryRun = fals
   }
 
   const { result, projectDir, newProjectDir, historyPath } = prepareOperation(oldPath, newPath, claudeDir, dryRun, noBackup, verbose);
+
+  if (!dryRun && !noBackup) {
+    result.backupPath = createBackup(join(historyPath, ".."), projectDir);
+  }
 
   try {
     renameAndUpdate(projectDir, newProjectDir, historyPath, oldPath, newPath, dryRun, verbose, result);
