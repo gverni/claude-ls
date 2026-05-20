@@ -41,7 +41,8 @@ program
   });
 
 program
-  .command("mv <old-path> <new-path>")
+  .command("move <old-path> <new-path>")
+  .alias("mv")
   .description("Move project directory and update all Claude references")
   .option("--dry-run", "Preview changes without modifying files")
   .option("--no-backup", "Skip creating a backup")

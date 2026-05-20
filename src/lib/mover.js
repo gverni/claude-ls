@@ -202,7 +202,7 @@ export function remapProject(oldPath, newPath, { claudeDir = null, dryRun = fals
   if (oldPath === newPath) throw new MoveError("Source and destination are the same path.");
   if (!existsSync(newPath)) {
     throw new MoveError(
-      `Destination directory does not exist: ${newPath}\nThe directory must already exist for 'remap'. Use 'claude-ls mv' if you haven't moved it yet.`
+      `Destination directory does not exist: ${newPath}\nThe directory must already exist for 'remap'. Use 'claude-ls move' if you haven't moved it yet.`
     );
   }
 
