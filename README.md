@@ -110,22 +110,22 @@ claude-ls inspect --claude-dir <path>
 
 Plans are matched by searching their content for the project path. This is a best-effort link - see [implementation notes](docs/implementation.md#plans-and-project-linking) for details.
 
-### `claude-ls mv <old-path> <new-path>`
+### `claude-ls move <old-path> <new-path>`
 
 Move a project directory and update all Claude Code internal references.
 
 ```bash
-claude-ls mv ~/projects/old ~/projects/new
-claude-ls mv ~/old ~/new --dry-run          # Preview without changes
-claude-ls mv ~/old ~/new --yes              # Skip confirmation
-claude-ls mv ~/old ~/new --no-backup        # Skip backup
-claude-ls mv ~/old ~/new --verbose          # Detailed output
-claude-ls mv ~/old ~/new --claude-dir <path>
+claude-ls move ~/projects/old ~/projects/new
+claude-ls move ~/old ~/new --dry-run          # Preview without changes
+claude-ls move ~/old ~/new --yes              # Skip confirmation
+claude-ls move ~/old ~/new --no-backup        # Skip backup
+claude-ls move ~/old ~/new --verbose          # Detailed output
+claude-ls move ~/old ~/new --claude-dir <path>
 ```
 
 #### Move behaviour by project type
 
-Before moving, `claude-ls mv` classifies the source path and adjusts its behaviour:
+Before moving, `claude-ls move` classifies the source path and adjusts its behaviour:
 
 | Scenario | What happens |
 |----------|-------------|

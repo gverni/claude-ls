@@ -48,9 +48,9 @@ The full data layout with all files and their relevance to each command is in th
 
 ---
 
-### `mv`
+### `move`
 
-`src/commands/mv.js` calls `classifyProject` then `moveProject` in `src/lib/mover.js`.
+`src/commands/move.js` calls `classifyProject` then `moveProject` in `src/lib/mover.js`.
 
 **Classification (before move):**
 
