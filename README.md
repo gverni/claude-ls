@@ -118,7 +118,6 @@ Move a project directory and update all Claude Code internal references.
 claude-ls move ~/projects/old ~/projects/new
 claude-ls move ~/old ~/new --dry-run          # Preview without changes
 claude-ls move ~/old ~/new --yes              # Skip confirmation
-claude-ls move ~/old ~/new --no-backup        # Skip backup
 claude-ls move ~/old ~/new --verbose          # Detailed output
 claude-ls move ~/old ~/new --claude-dir <path>
 ```
@@ -144,7 +143,6 @@ Use this when you've already renamed or moved the folder yourself and just need 
 claude-ls remap ~/old/path ~/new/path
 claude-ls remap ~/old ~/new --dry-run
 claude-ls remap ~/old ~/new --yes
-claude-ls remap ~/old ~/new --no-backup
 claude-ls remap ~/old ~/new --verbose
 claude-ls remap ~/old ~/new --claude-dir <path>
 ```

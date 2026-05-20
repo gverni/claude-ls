@@ -74,7 +74,7 @@ If any step fails, the directory is copied back (rollback).
 
 **Not updated:** session `.jsonl` content (other than `cwd`). These are conversation transcripts with no functional impact on Claude Code.
 
-**Flags:** `--dry-run`, `--no-backup`, `--yes`, `--verbose`, `--claude-dir`
+**Flags:** `--dry-run`, `--yes`, `--verbose`, `--claude-dir`
 
 ---
 

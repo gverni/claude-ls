@@ -37,7 +37,7 @@ describe("mv command", () => {
       sessions: [{ id: "s1", modified: "2026-01-01T00:00:00" }],
     });
 
-    await mvCommand(srcDir, dstDir, { yes: true, claudeDir: fixture.claudeDir, noBackup: true });
+    await mvCommand(srcDir, dstDir, { yes: true, claudeDir: fixture.claudeDir });
     const combined = output.join("\n");
     assert.ok(combined.includes("Done"));
     assert.ok(!existsSync(srcDir));
@@ -50,7 +50,7 @@ describe("mv command", () => {
       sessions: [{ id: "s1", modified: "2026-01-01T00:00:00" }],
     });
 
-    await mvCommand(srcDir, dstDir, { dryRun: true, claudeDir: fixture.claudeDir, noBackup: true });
+    await mvCommand(srcDir, dstDir, { dryRun: true, claudeDir: fixture.claudeDir });
     const combined = output.join("\n");
     assert.ok(combined.includes("DRY RUN"));
     assert.ok(existsSync(srcDir));
@@ -63,7 +63,7 @@ describe("mv command", () => {
     process.exit = (code) => { exitCode = code; throw new Error("EXIT"); };
 
     try {
-      await mvCommand("/nonexistent/path", dstDir, { yes: true, claudeDir: fixture.claudeDir, noBackup: true });
+      await mvCommand("/nonexistent/path", dstDir, { yes: true, claudeDir: fixture.claudeDir });
     } catch (e) {
       if (e.message !== "EXIT") throw e;
     }
@@ -80,7 +80,7 @@ describe("mv command", () => {
       sessions: [{ id: "s1", modified: "2026-01-01T00:00:00" }],
     });
 
-    await mvCommand(srcDir, dstDir, { yes: true, claudeDir: fixture.claudeDir, noBackup: true });
+    await mvCommand(srcDir, dstDir, { yes: true, claudeDir: fixture.claudeDir });
     const combined = output.join("\n");
     assert.ok(combined.includes("From:"));
     assert.ok(combined.includes("To:"));

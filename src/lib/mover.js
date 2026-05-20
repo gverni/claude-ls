@@ -126,7 +126,7 @@ function updateDataFiles(historyPath, oldPath, newPath, dryRun, result, verbose)
   result.usageDataUpdated = updateUsageData(claudeDir, oldPath, newPath, { dryRun, verbose });
 }
 
-function prepareOperation(oldPath, newPath, claudeDir, dryRun, noBackup, verbose) {
+function prepareOperation(oldPath, newPath, claudeDir, dryRun, verbose) {
   if (!claudeDir) claudeDir = findClaudeDir();
 
   const result = new MoveResult();
@@ -158,7 +158,7 @@ export function previewOperation(oldPath, claudeDir = null) {
   };
 }
 
-export function moveProject(oldPath, newPath, { claudeDir = null, dryRun = false, noBackup = false, verbose = false, updateCwd = false } = {}) {
+export function moveProject(oldPath, newPath, { claudeDir = null, dryRun = false, verbose = false, updateCwd = false } = {}) {
   oldPath = resolve(oldPath);
   newPath = resolve(newPath);
 
@@ -173,7 +173,7 @@ export function moveProject(oldPath, newPath, { claudeDir = null, dryRun = false
     }
   }
 
-  const { result, projectDir, newProjectDir, historyPath } = prepareOperation(oldPath, newPath, claudeDir, dryRun, noBackup, verbose);
+  const { result, projectDir, newProjectDir, historyPath } = prepareOperation(oldPath, newPath, claudeDir, dryRun, verbose);
 
   try {
     if (!dryRun) {
@@ -195,7 +195,7 @@ export function moveProject(oldPath, newPath, { claudeDir = null, dryRun = false
   return result;
 }
 
-export function remapProject(oldPath, newPath, { claudeDir = null, dryRun = false, noBackup = false, verbose = false, updateCwd = false } = {}) {
+export function remapProject(oldPath, newPath, { claudeDir = null, dryRun = false, verbose = false, updateCwd = false } = {}) {
   oldPath = resolve(oldPath);
   newPath = resolve(newPath);
 
@@ -206,7 +206,7 @@ export function remapProject(oldPath, newPath, { claudeDir = null, dryRun = fals
     );
   }
 
-  const { result, projectDir, newProjectDir, historyPath } = prepareOperation(oldPath, newPath, claudeDir, dryRun, noBackup, verbose);
+  const { result, projectDir, newProjectDir, historyPath } = prepareOperation(oldPath, newPath, claudeDir, dryRun, verbose);
 
   try {
     renameAndUpdate(projectDir, newProjectDir, historyPath, oldPath, newPath, dryRun, verbose, result);

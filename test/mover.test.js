@@ -35,7 +35,6 @@ describe("moveProject", () => {
 
     const result = moveProject(srcDir, dstDir, {
       claudeDir: fixture.claudeDir,
-      noBackup: true,
     });
 
     assert.ok(!existsSync(srcDir));
@@ -47,7 +46,7 @@ describe("moveProject", () => {
 
   it("throws when source does not exist", () => {
     assert.throws(
-      () => moveProject("/nonexistent/src", dstDir, { claudeDir: fixture.claudeDir, noBackup: true }),
+      () => moveProject("/nonexistent/src", dstDir, { claudeDir: fixture.claudeDir }),
       MoveError
     );
   });
@@ -57,14 +56,14 @@ describe("moveProject", () => {
     writeFileSync(join(dstDir, "existing.txt"), "content", "utf-8");
 
     assert.throws(
-      () => moveProject(srcDir, dstDir, { claudeDir: fixture.claudeDir, noBackup: true }),
+      () => moveProject(srcDir, dstDir, { claudeDir: fixture.claudeDir }),
       MoveError
     );
   });
 
   it("throws when source and destination are the same", () => {
     assert.throws(
-      () => moveProject(srcDir, srcDir, { claudeDir: fixture.claudeDir, noBackup: true }),
+      () => moveProject(srcDir, srcDir, { claudeDir: fixture.claudeDir }),
       MoveError
     );
   });
@@ -77,7 +76,6 @@ describe("moveProject", () => {
 
     const result = moveProject(srcDir, dstDir, {
       claudeDir: fixture.claudeDir,
-      noBackup: true,
       dryRun: true,
     });
 
@@ -116,7 +114,6 @@ describe("remapProject", () => {
 
     const result = remapProject(oldPath, dstDir, {
       claudeDir: fixture.claudeDir,
-      noBackup: true,
     });
 
     assert.ok(result.projectDirRenamed);
@@ -125,7 +122,7 @@ describe("remapProject", () => {
 
   it("throws when destination does not exist", () => {
     assert.throws(
-      () => remapProject("/old/path", "/nonexistent/dst", { claudeDir: fixture.claudeDir, noBackup: true }),
+      () => remapProject("/old/path", "/nonexistent/dst", { claudeDir: fixture.claudeDir }),
       MoveError
     );
   });

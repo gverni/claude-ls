@@ -40,7 +40,7 @@ describe("remap command", () => {
       }],
     });
 
-    await remapCommand(oldPath, dstDir, { yes: true, claudeDir: fixture.claudeDir, noBackup: true });
+    await remapCommand(oldPath, dstDir, { yes: true, claudeDir: fixture.claudeDir });
     const combined = output.join("\n");
     assert.ok(combined.includes("Done"));
   });
@@ -52,7 +52,7 @@ describe("remap command", () => {
       sessions: [{ id: "s1", modified: "2026-01-01T00:00:00" }],
     });
 
-    await remapCommand(oldPath, dstDir, { dryRun: true, claudeDir: fixture.claudeDir, noBackup: true });
+    await remapCommand(oldPath, dstDir, { dryRun: true, claudeDir: fixture.claudeDir });
     const combined = output.join("\n");
     assert.ok(combined.includes("DRY RUN"));
   });
@@ -63,7 +63,7 @@ describe("remap command", () => {
     process.exit = (code) => { exitCode = code; throw new Error("EXIT"); };
 
     try {
-      await remapCommand("/old/path", "/nonexistent/destination", { yes: true, claudeDir: fixture.claudeDir, noBackup: true });
+      await remapCommand("/old/path", "/nonexistent/destination", { yes: true, claudeDir: fixture.claudeDir });
     } catch (e) {
       if (e.message !== "EXIT") throw e;
     }
@@ -81,7 +81,7 @@ describe("remap command", () => {
       sessions: [{ id: "s1", modified: "2026-01-01T00:00:00" }],
     });
 
-    await remapCommand(oldPath, dstDir, { yes: true, claudeDir: fixture.claudeDir, noBackup: true });
+    await remapCommand(oldPath, dstDir, { yes: true, claudeDir: fixture.claudeDir });
     const combined = output.join("\n");
     assert.ok(combined.includes("Old:"));
     assert.ok(combined.includes("New:"));

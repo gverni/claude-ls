@@ -84,7 +84,6 @@ export async function mvCommand(oldPath, newPath, opts = {}) {
     const result = moveProject(oldPath, newPath, {
       claudeDir,
       dryRun: opts.dryRun,
-      noBackup: opts.noBackup,
       verbose: opts.verbose,
       updateCwd,
     });
