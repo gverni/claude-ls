@@ -83,7 +83,6 @@ export async function remapCommand(oldPath, newPath, opts = {}) {
     const result = remapProject(oldPath, newPath, {
       claudeDir,
       dryRun: opts.dryRun,
-      noBackup: opts.noBackup,
       verbose: opts.verbose,
       updateCwd,
     });

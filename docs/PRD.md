@@ -67,7 +67,6 @@ If the destination Claude data directory already exists, the command errors out.
 
 **Flags:**
 - `--dry-run` - preview changes without modifying files
-- `--no-backup` - skip backup creation
 - `--yes` / `-y` - skip confirmation prompt
 - `--verbose` / `-v` - show detailed output
 - `--claude-dir <path>` - override Claude data directory
