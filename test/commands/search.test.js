@@ -66,13 +66,60 @@ describe("search command", () => {
     assert.ok(combined.includes(project2Dir));
   });
 
-  it("outputs JSON with --json flag", async () => {
+  it("shows session count and last active date", async () => {
+    fixture.addProject({
+      path: projectDir,
+      sessions: [{ id: "s1", modified: "2026-04-01T10:00:00" }],
+    });
+
+    await searchCommand("test-project", { claudeDir: fixture.claudeDir });
+    const combined = output.join("\n");
+    assert.ok(combined.includes("sessions: 1"));
+    assert.ok(combined.includes("last active:"));
+  });
+
+  it("shows no sessions when project has none", async () => {
     fixture.addProject({ path: projectDir, sessions: [] });
+
+    await searchCommand("test-project", { claudeDir: fixture.claudeDir });
+    assert.ok(output.some((line) => line.includes("no sessions")));
+  });
+
+  it("sorts by most recent with --sort recent", async () => {
+    const oldDir = join(fixture.claudeDir, "..", "search-alpha");
+    const newDir = join(fixture.claudeDir, "..", "search-omega");
+    mkdirSync(oldDir, { recursive: true });
+    mkdirSync(newDir, { recursive: true });
+    fixture.addProject({ path: oldDir, sessions: [{ id: "s1", modified: "2026-01-01T00:00:00" }] });
+    fixture.addProject({ path: newDir, sessions: [{ id: "s2", modified: "2026-05-01T00:00:00" }] });
+
+    await searchCommand("search-", { claudeDir: fixture.claudeDir, sort: "recent" });
+    const combined = output.join("\n");
+    assert.ok(combined.indexOf(newDir) < combined.indexOf(oldDir), "Newer project should appear first");
+  });
+
+  it("sorts by oldest with --sort oldest", async () => {
+    const oldDir = join(fixture.claudeDir, "..", "search-alpha");
+    const newDir = join(fixture.claudeDir, "..", "search-omega");
+    mkdirSync(oldDir, { recursive: true });
+    mkdirSync(newDir, { recursive: true });
+    fixture.addProject({ path: oldDir, sessions: [{ id: "s1", modified: "2026-01-01T00:00:00" }] });
+    fixture.addProject({ path: newDir, sessions: [{ id: "s2", modified: "2026-05-01T00:00:00" }] });
+
+    await searchCommand("search-", { claudeDir: fixture.claudeDir, sort: "oldest" });
+    const combined = output.join("\n");
+    assert.ok(combined.indexOf(oldDir) < combined.indexOf(newDir), "Older project should appear first");
+  });
+
+  it("outputs JSON with --json flag including session info", async () => {
+    fixture.addProject({ path: projectDir, sessions: [{ id: "s1", modified: "2026-04-01T10:00:00" }] });
 
     await searchCommand("test-project", { claudeDir: fixture.claudeDir, json: true });
     const parsed = JSON.parse(output.join(""));
     assert.ok(Array.isArray(parsed));
     assert.equal(parsed[0].projectPath, projectDir);
     assert.equal(typeof parsed[0].exists, "boolean");
+    assert.equal(typeof parsed[0].sessionCount, "number");
+    assert.ok("lastModified" in parsed[0]);
   });
 });

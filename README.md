@@ -152,12 +152,14 @@ claude-ls remap ~/old ~/new --claude-dir <path>
 Search for projects by path name.
 
 ```bash
-claude-ls search payment              # Find projects whose path contains "payment"
-claude-ls search --json               # Output as JSON
-claude-ls search --claude-dir <path>
+claude-ls search payment                      # Find projects whose path contains "payment"
+claude-ls search payment --sort recent        # Sort by most recently active
+claude-ls search payment --sort oldest        # Sort by least recently active
+claude-ls search payment --json               # Output as JSON
+claude-ls search payment --claude-dir <path>
 ```
 
-Search is case-insensitive and includes orphaned projects.
+Search is case-insensitive and includes orphaned projects. Each result shows the session count and last active date.
 
 ### `claude-ls prune [path]`
 
