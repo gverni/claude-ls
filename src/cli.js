@@ -81,6 +81,7 @@ program
   .command("search <query>")
   .description("Search across projects (CLAUDE.md, settings, sessions)")
   .option("--json", "Output as JSON")
+  .option("--sort <order>", "Sort order: recent, oldest, alpha (default: alpha)", "alpha")
   .option("--claude-dir <path>", "Override Claude data directory")
   .action(async (query, opts) => {
     const { searchCommand } = await import("./commands/search.js");
