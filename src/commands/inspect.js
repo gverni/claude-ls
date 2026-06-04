@@ -145,17 +145,25 @@ function loadSessions(projectDir) {
 }
 
 function readSessionSlug(jsonlPath) {
+  let slug = null;
+  let customTitle = null;
   try {
-    const content = readFileSync(jsonlPath, "utf-8");
-    for (const line of content.split("\n").slice(0, 30)) {
+    const lines = readFileSync(jsonlPath, "utf-8").split("\n");
+    for (const line of lines) {
       if (!line.trim()) continue;
       try {
         const obj = JSON.parse(line);
-        if (obj.slug) return obj.slug;
+        if (obj.type === "custom-title" && obj.customTitle) {
+          customTitle = obj.customTitle;
+        }
+        if (!slug && obj.slug) {
+          slug = obj.slug;
+        }
       } catch {}
     }
   } catch {}
-  return null;
+  // custom-title (set by /rename) takes priority over auto-generated slug
+  return customTitle || slug || null;
 }
 
 function display(data) {

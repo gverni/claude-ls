@@ -113,7 +113,6 @@ describe("inspect command", () => {
 
     fixture.addProject({ path: projectDir, sessions: [] });
 
-    // Write a session jsonl with a slug field on one of the lines
     const encoded = encodePath(projectDir);
     const sessionDir = j(fixture.claudeDir, "projects", encoded);
     mk(sessionDir, { recursive: true });
@@ -128,6 +127,30 @@ describe("inspect command", () => {
     const combined = output.join("\n");
     assert.ok(combined.includes(sessionId));
     assert.ok(combined.includes("tidy-golden-lamp"));
+  });
+
+  it("prefers custom-title over slug when session has been renamed", async () => {
+    const { mkdirSync: mk, writeFileSync: wf } = await import("fs");
+    const { encodePath } = await import("../../src/lib/encoder.js");
+    const { join: j } = await import("path");
+
+    fixture.addProject({ path: projectDir, sessions: [] });
+
+    const encoded = encodePath(projectDir);
+    const sessionDir = j(fixture.claudeDir, "projects", encoded);
+    mk(sessionDir, { recursive: true });
+    const sessionId = "dddd4444-0000-0000-0000-000000000000";
+    const lines = [
+      JSON.stringify({ type: "user", cwd: projectDir, sessionId }),
+      JSON.stringify({ type: "assistant", sessionId, slug: "auto-generated-slug" }),
+      JSON.stringify({ type: "custom-title", customTitle: "my rename", sessionId }),
+    ];
+    wf(j(sessionDir, sessionId + ".jsonl"), lines.join("\n") + "\n", "utf-8");
+
+    await inspectCommand(projectDir, { claudeDir: fixture.claudeDir });
+    const combined = output.join("\n");
+    assert.ok(combined.includes("my rename"));
+    assert.ok(!combined.includes("auto-generated-slug"));
   });
 
   it("shows session count of 0 when no sessions", async () => {
