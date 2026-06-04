@@ -225,6 +225,56 @@ describe("inspect command", () => {
     assert.ok(combined.includes("(0)"));
   });
 
+  it("shows memory entries from project encoded directory", async () => {
+    const projectDir2 = fixture.addProject({ path: projectDir, sessions: [] });
+    const memoryDir = join(projectDir2, "memory");
+    mkdirSync(memoryDir, { recursive: true });
+    writeFileSync(
+      join(memoryDir, "pref-no-em-dash.md"),
+      "---\nname: No em dashes\ndescription: Never use em dashes in output\ntype: feedback\n---\n\nContent here.\n",
+      "utf-8"
+    );
+    writeFileSync(
+      join(memoryDir, "MEMORY.md"),
+      "# Memory Index\n\n- [No em dashes](pref-no-em-dash.md)\n",
+      "utf-8"
+    );
+
+    await inspectCommand(projectDir, { claudeDir: fixture.claudeDir });
+    const combined = output.join("\n");
+    assert.ok(combined.includes("Memory"));
+    assert.ok(combined.includes("No em dashes"));
+    assert.ok(combined.includes("Never use em dashes"));
+    assert.ok(combined.includes("MEMORY.md"));
+  });
+
+  it("shows memory count of 0 when no memory directory", async () => {
+    fixture.addProject({ path: projectDir, sessions: [] });
+
+    await inspectCommand(projectDir, { claudeDir: fixture.claudeDir });
+    const combined = output.join("\n");
+    assert.ok(combined.includes("Memory"));
+    assert.ok(combined.includes("(0)"));
+  });
+
+  it("outputs memory in --json flag", async () => {
+    const projectDir2 = fixture.addProject({ path: projectDir, sessions: [] });
+    const memoryDir = join(projectDir2, "memory");
+    mkdirSync(memoryDir, { recursive: true });
+    writeFileSync(
+      join(memoryDir, "pref-terse.md"),
+      "---\nname: Be terse\ndescription: Keep responses short\ntype: feedback\n---\n",
+      "utf-8"
+    );
+
+    await inspectCommand(projectDir, { claudeDir: fixture.claudeDir, json: true });
+    const parsed = JSON.parse(output.join(""));
+    assert.ok(Array.isArray(parsed.memory));
+    assert.equal(parsed.memory.length, 1);
+    assert.equal(parsed.memory[0].name, "Be terse");
+    assert.equal(parsed.memory[0].description, "Keep responses short");
+  });
+
   it("shows orphaned project with data from claude.json", async () => {
     const orphanPath = "/nonexistent/orphan-inspect";
     fixture.addProject({ path: orphanPath, sessions: [] });

@@ -83,6 +83,7 @@ function loadProjectData(projectPath, claudeDir) {
     exists,
     claudeMd: loadClaudeMd(projectPath),
     plans: loadPlans(claudeDir, projectPath),
+    memory: loadMemory(projectDir),
     sessions: projectDir ? loadSessions(projectDir) : [],
     mcps: {
       global: entry.mcpServers || {},
@@ -124,6 +125,33 @@ function loadPlans(claudeDir, projectPath) {
     }
   } catch {}
   return plans;
+}
+
+function loadMemory(projectDir) {
+  if (!projectDir) return [];
+  const memoryDir = join(projectDir, "memory");
+  if (!existsSync(memoryDir)) return [];
+  const entries = [];
+  try {
+    for (const file of readdirSync(memoryDir).filter((f) => f.endsWith(".md"))) {
+      const filePath = join(memoryDir, file);
+      try {
+        const content = readFileSync(filePath, "utf-8");
+        const name = parseFrontmatterField(content, "name") || file.replace(/\.md$/, "");
+        const description = parseFrontmatterField(content, "description") || "";
+        entries.push({ file, name, description });
+      } catch {}
+    }
+  } catch {}
+  // MEMORY.md index first, then alphabetical
+  return entries.sort((a, b) =>
+    a.file === "MEMORY.md" ? -1 : b.file === "MEMORY.md" ? 1 : a.file.localeCompare(b.file)
+  );
+}
+
+function parseFrontmatterField(content, field) {
+  const match = content.match(new RegExp(`^${field}:\\s*(.+)$`, "m"));
+  return match ? match[1].trim() : null;
 }
 
 function loadSessions(projectDir) {
@@ -181,6 +209,22 @@ function display(data) {
   if (data.plans.length > 0) {
     for (const p of data.plans) {
       console.log("  ⎿  " + p.title + "  " + chalk.dim(p.file));
+    }
+  } else {
+    console.log("  " + chalk.dim("none"));
+  }
+  console.log();
+
+  // Memory
+  console.log(chalk.bold("  Memory") + chalk.dim(" (" + data.memory.length + ")"));
+  if (data.memory.length > 0) {
+    for (const m of data.memory) {
+      if (m.file === "MEMORY.md") {
+        console.log("  ⎿  " + chalk.dim(m.file) + "  " + chalk.dim("(index)"));
+      } else {
+        const desc = m.description ? "  " + chalk.dim(m.description) : "";
+        console.log("  ⎿  " + m.name + desc);
+      }
     }
   } else {
     console.log("  " + chalk.dim("none"));
