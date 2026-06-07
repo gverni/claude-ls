@@ -145,8 +145,6 @@ function loadSessions(projectDir) {
 }
 
 function readSessionSlug(jsonlPath) {
-  let slug = null;
-  let customTitle = null;
   try {
     const lines = readFileSync(jsonlPath, "utf-8").split("\n");
     for (const line of lines) {
@@ -154,16 +152,12 @@ function readSessionSlug(jsonlPath) {
       try {
         const obj = JSON.parse(line);
         if (obj.type === "custom-title" && obj.customTitle) {
-          customTitle = obj.customTitle;
-        }
-        if (!slug && obj.slug) {
-          slug = obj.slug;
+          return obj.customTitle;
         }
       } catch {}
     }
   } catch {}
-  // custom-title (set by /rename) takes priority over auto-generated slug
-  return customTitle || slug || null;
+  return null;
 }
 
 function display(data) {

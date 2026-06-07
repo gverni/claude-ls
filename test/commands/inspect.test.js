@@ -106,7 +106,7 @@ describe("inspect command", () => {
     assert.ok(combined.includes("last:"));
   });
 
-  it("shows session slug when present in jsonl", async () => {
+  it("shows custom-title when session has been renamed", async () => {
     const { mkdirSync: mk, writeFileSync: wf } = await import("fs");
     const { encodePath } = await import("../../src/lib/encoder.js");
     const { join: j } = await import("path");
@@ -119,7 +119,7 @@ describe("inspect command", () => {
     const sessionId = "cccc3333-0000-0000-0000-000000000000";
     const lines = [
       JSON.stringify({ type: "user", cwd: projectDir, sessionId }),
-      JSON.stringify({ type: "assistant", sessionId, slug: "tidy-golden-lamp" }),
+      JSON.stringify({ type: "custom-title", customTitle: "tidy-golden-lamp", sessionId }),
     ];
     wf(j(sessionDir, sessionId + ".jsonl"), lines.join("\n") + "\n", "utf-8");
 
@@ -129,7 +129,7 @@ describe("inspect command", () => {
     assert.ok(combined.includes("tidy-golden-lamp"));
   });
 
-  it("prefers custom-title over slug when session has been renamed", async () => {
+  it("shows no title when session has not been renamed", async () => {
     const { mkdirSync: mk, writeFileSync: wf } = await import("fs");
     const { encodePath } = await import("../../src/lib/encoder.js");
     const { join: j } = await import("path");
@@ -143,13 +143,12 @@ describe("inspect command", () => {
     const lines = [
       JSON.stringify({ type: "user", cwd: projectDir, sessionId }),
       JSON.stringify({ type: "assistant", sessionId, slug: "auto-generated-slug" }),
-      JSON.stringify({ type: "custom-title", customTitle: "my rename", sessionId }),
     ];
     wf(j(sessionDir, sessionId + ".jsonl"), lines.join("\n") + "\n", "utf-8");
 
     await inspectCommand(projectDir, { claudeDir: fixture.claudeDir });
     const combined = output.join("\n");
-    assert.ok(combined.includes("my rename"));
+    assert.ok(combined.includes(sessionId));
     assert.ok(!combined.includes("auto-generated-slug"));
   });
 
