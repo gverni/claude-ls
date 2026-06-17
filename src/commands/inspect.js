@@ -232,7 +232,7 @@ function display(data) {
   console.log(chalk.bold("  Sessions") + chalk.dim(" (" + data.sessions.length + ")"));
   if (data.sessions.length > 0) {
     for (const s of data.sessions) {
-      const label = s.slug ? s.slug + " " + chalk.dim("(" + s.id + ")") : chalk.dim(s.id);
+      const label = s.slug ? chalk.cyan(s.slug) + " " + chalk.dim("(" + s.id + ")") : chalk.dim(s.id);
       console.log("  ⎿  " + label);
       console.log("     created: " + formatDate(s.created) + "  last: " + formatDate(s.lastInteraction));
     }
