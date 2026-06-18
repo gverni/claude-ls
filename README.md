@@ -74,7 +74,7 @@ claude-ls list --claude-dir <path>    # Override Claude data directory
 
 ### `claude-ls inspect [path]`
 
-Show project properties: MCPs, allowed tools, sessions, CLAUDE.md, and plans.
+Show project properties: MCPs, allowed tools, sessions, CLAUDE.md, plans, and memory.
 
 ```bash
 claude-ls inspect                     # Interactive project picker
@@ -102,11 +102,24 @@ claude-ls inspect --claude-dir <path>
   ⎿  Bash, Read, Edit, Write  (global)
   ⎿  Bash(npm run *)  (settings.json)
 
+  Memory (2)
+  ⎿  No em dashes  Never use em dashes in output
+  ⎿  Reports in English  All headings must be in English
+
   Sessions (3)
   ⎿  a1b2c3d4  created: 2026-05-01 09:00  last: 2026-05-10 14:30
   ⎿  e5f6g7h8  created: 2026-04-15 11:00  last: 2026-04-20 17:45
   ⎿  i9j0k1l2  created: 2026-03-01 10:00  last: 2026-03-01 10:00
 ```
+
+| Section | Source |
+|---|---|
+| **CLAUDE.md** | First heading from `CLAUDE.md` in the project root |
+| **Plans** | `.md` files in `~/.claude/plans/` whose content mentions the project path |
+| **MCPs** | MCP servers from `~/.claude.json` (global) and `.mcp.json` in the project root |
+| **Allowed tools** | Tools from `~/.claude.json`, `.claude/settings.json`, and `.claude/settings.local.json` |
+| **Memory** | `.md` files in `~/.claude/projects/{encoded}/memory/`, written by Claude Code's auto-memory system |
+| **Sessions** | `.jsonl` transcript files in `~/.claude/projects/{encoded}/` |
 
 Plans are matched by searching their content for the project path. This is a best-effort link - see [implementation notes](docs/implementation.md#plans-and-project-linking) for details.
 
