@@ -135,12 +135,29 @@ function loadSessions(projectDir) {
       const st = statSync(full);
       sessions.push({
         id: entry.name.replace(/\.jsonl$/, ""),
+        slug: readSessionSlug(full),
         created: st.birthtime.toISOString(),
         lastInteraction: st.mtime.toISOString(),
       });
     }
   } catch {}
   return sessions.sort((a, b) => b.lastInteraction.localeCompare(a.lastInteraction));
+}
+
+function readSessionSlug(jsonlPath) {
+  try {
+    const lines = readFileSync(jsonlPath, "utf-8").split("\n");
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        const obj = JSON.parse(line);
+        if (obj.type === "custom-title" && obj.customTitle) {
+          return obj.customTitle;
+        }
+      } catch {}
+    }
+  } catch {}
+  return null;
 }
 
 function display(data) {
@@ -215,10 +232,9 @@ function display(data) {
   console.log(chalk.bold("  Sessions") + chalk.dim(" (" + data.sessions.length + ")"));
   if (data.sessions.length > 0) {
     for (const s of data.sessions) {
-      const id = chalk.dim(s.id.slice(0, 8));
-      const created = "created: " + formatDate(s.created);
-      const last = "last: " + formatDate(s.lastInteraction);
-      console.log("  ⎿  " + id + "  " + created + "  " + last);
+      const label = s.slug ? chalk.cyan(s.slug) + " " + chalk.dim("(" + s.id + ")") : chalk.dim(s.id);
+      console.log("  ⎿  " + label);
+      console.log("     created: " + formatDate(s.created) + "  last: " + formatDate(s.lastInteraction));
     }
   } else {
     console.log("  " + chalk.dim("none"));
