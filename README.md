@@ -74,7 +74,7 @@ claude-ls list --claude-dir <path>    # Override Claude data directory
 
 ### `claude-ls inspect [path]`
 
-Show project properties: MCPs, allowed tools, sessions, CLAUDE.md, and plans.
+Show project properties: MCPs, allowed tools, sessions, CLAUDE.md, plans, and memory.
 
 ```bash
 claude-ls inspect                     # Interactive project picker
@@ -101,6 +101,11 @@ claude-ls inspect --claude-dir <path>
   Allowed tools
   ⎿  Bash, Read, Edit, Write  (global)
   ⎿  Bash(npm run *)  (settings.json)
+
+  Memory (3)
+  ⎿  MEMORY.md  (index)
+  ⎿  No em dashes  Never use em dashes in output
+  ⎿  Reports in English  All headings must be in English
 
   Sessions (3)
   ⎿  a1b2c3d4  created: 2026-05-01 09:00  last: 2026-05-10 14:30
