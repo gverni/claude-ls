@@ -112,6 +112,15 @@ claude-ls inspect --claude-dir <path>
   ⎿  i9j0k1l2  created: 2026-03-01 10:00  last: 2026-03-01 10:00
 ```
 
+| Section | Source |
+|---|---|
+| **CLAUDE.md** | First heading from `CLAUDE.md` in the project root |
+| **Plans** | `.md` files in `~/.claude/plans/` whose content mentions the project path |
+| **MCPs** | MCP servers from `~/.claude.json` (global) and `.mcp.json` in the project root |
+| **Allowed tools** | Tools from `~/.claude.json`, `.claude/settings.json`, and `.claude/settings.local.json` |
+| **Memory** | `.md` files in `~/.claude/projects/{encoded}/memory/`, written by Claude Code's auto-memory system |
+| **Sessions** | `.jsonl` transcript files in `~/.claude/projects/{encoded}/` |
+
 Plans are matched by searching their content for the project path. This is a best-effort link - see [implementation notes](docs/implementation.md#plans-and-project-linking) for details.
 
 ### `claude-ls move <old-path> <new-path>`
