@@ -143,10 +143,7 @@ function loadMemory(projectDir) {
       } catch {}
     }
   } catch {}
-  // MEMORY.md index first, then alphabetical
-  return entries.sort((a, b) =>
-    a.file === "MEMORY.md" ? -1 : b.file === "MEMORY.md" ? 1 : a.file.localeCompare(b.file)
-  );
+  return entries.sort((a, b) => a.file.localeCompare(b.file));
 }
 
 function parseFrontmatterField(content, field) {
@@ -219,12 +216,9 @@ function display(data) {
   console.log(chalk.bold("  Memory") + chalk.dim(" (" + data.memory.length + ")"));
   if (data.memory.length > 0) {
     for (const m of data.memory) {
-      if (m.file === "MEMORY.md") {
-        console.log("  ⎿  " + chalk.dim(m.file) + "  " + chalk.dim("(index)"));
-      } else {
-        const desc = m.description ? "  " + chalk.dim(m.description) : "";
-        console.log("  ⎿  " + m.name + desc);
-      }
+      if (m.file === "MEMORY.md") continue;
+      const desc = m.description ? "  " + chalk.dim(m.description) : "";
+      console.log("  ⎿  " + m.name + desc);
     }
   } else {
     console.log("  " + chalk.dim("none"));

@@ -245,7 +245,7 @@ describe("inspect command", () => {
     assert.ok(combined.includes("Memory"));
     assert.ok(combined.includes("No em dashes"));
     assert.ok(combined.includes("Never use em dashes"));
-    assert.ok(combined.includes("MEMORY.md"));
+    assert.ok(!combined.includes("MEMORY.md"));
   });
 
   it("shows memory count of 0 when no memory directory", async () => {

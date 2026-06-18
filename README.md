@@ -102,8 +102,7 @@ claude-ls inspect --claude-dir <path>
   ⎿  Bash, Read, Edit, Write  (global)
   ⎿  Bash(npm run *)  (settings.json)
 
-  Memory (3)
-  ⎿  MEMORY.md  (index)
+  Memory (2)
   ⎿  No em dashes  Never use em dashes in output
   ⎿  Reports in English  All headings must be in English
 
