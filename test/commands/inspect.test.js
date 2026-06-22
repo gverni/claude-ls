@@ -225,6 +225,54 @@ describe("inspect command", () => {
     assert.ok(combined.includes("(0)"));
   });
 
+  it("shows resume hint with project path when sessions exist", async () => {
+    fixture.addProject({ path: projectDir, sessions: [{ id: "s1" }] });
+
+    await inspectCommand(projectDir, { claudeDir: fixture.claudeDir });
+    const combined = output.join("\n");
+    assert.ok(combined.includes("resume:"));
+    assert.ok(combined.includes(projectDir));
+    assert.ok(combined.includes("claude --resume"));
+  });
+
+  it("omits resume hint when there are no sessions", async () => {
+    fixture.addProject({ path: projectDir, sessions: [] });
+
+    await inspectCommand(projectDir, { claudeDir: fixture.claudeDir });
+    const combined = output.join("\n");
+    assert.ok(!combined.includes("resume:"));
+  });
+
+  it("warns when another project shares the same basename", async () => {
+    const sibling = join(fixture.claudeDir, "..", "elsewhere", "test-project");
+    mkdirSync(sibling, { recursive: true });
+    fixture.addProject({ path: projectDir, sessions: [{ id: "s1" }] });
+    fixture.addProject({ path: sibling, sessions: [{ id: "s2" }] });
+
+    await inspectCommand(projectDir, { claudeDir: fixture.claudeDir });
+    const combined = output.join("\n");
+    assert.ok(combined.includes("same basename"));
+    assert.ok(combined.includes(sibling));
+  });
+
+  it("does not warn when the basename is unique", async () => {
+    fixture.addProject({ path: projectDir, sessions: [] });
+
+    await inspectCommand(projectDir, { claudeDir: fixture.claudeDir });
+    const combined = output.join("\n");
+    assert.ok(!combined.includes("same basename"));
+  });
+
+  it("includes resumeHint and basenameCollisions in --json", async () => {
+    fixture.addProject({ path: projectDir, sessions: [{ id: "s1" }] });
+
+    await inspectCommand(projectDir, { claudeDir: fixture.claudeDir, json: true });
+    const parsed = JSON.parse(output.join(""));
+    assert.equal(typeof parsed.resumeHint, "string");
+    assert.ok(parsed.resumeHint.includes(projectDir));
+    assert.ok(Array.isArray(parsed.basenameCollisions));
+  });
+
   it("shows orphaned project with data from claude.json", async () => {
     const orphanPath = "/nonexistent/orphan-inspect";
     fixture.addProject({ path: orphanPath, sessions: [] });
