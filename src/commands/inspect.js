@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "fs";
-import { join, resolve } from "path";
+import { basename, join, resolve } from "path";
 import chalk from "chalk";
 import { findClaudeDir, listProjects, findProjectDir } from "../lib/scanner.js";
 import { interactiveSelect } from "../lib/select.js";
@@ -78,12 +78,18 @@ function loadProjectData(projectPath, claudeDir) {
     }
   }
 
+  const sessions = projectDir ? loadSessions(projectDir) : [];
+
   return {
     projectPath,
     exists,
     claudeMd: loadClaudeMd(projectPath),
     plans: loadPlans(claudeDir, projectPath),
-    sessions: projectDir ? loadSessions(projectDir) : [],
+    sessions,
+    resumeHint: sessions.length
+      ? `cd ${projectPath} && claude --resume <session-id>`
+      : null,
+    basenameCollisions: findBasenameCollisions(claudeDir, projectPath),
     mcps: {
       global: entry.mcpServers || {},
       project: projectMcps,
@@ -95,6 +101,19 @@ function loadProjectData(projectPath, claudeDir) {
       local: localSettings.allowedTools || [],
     },
   };
+}
+
+function findBasenameCollisions(claudeDir, projectPath) {
+  const targetBase = basename(projectPath);
+  const collisions = [];
+  for (const p of listProjects(claudeDir)) {
+    for (const proj of [p, ...(p.subfolders || []), ...(p.worktrees || [])]) {
+      if (proj.projectPath === projectPath) continue;
+      if (proj.exists === false) continue;
+      if (basename(proj.projectPath) === targetBase) collisions.push(proj.projectPath);
+    }
+  }
+  return [...new Set(collisions)];
 }
 
 function loadClaudeMd(projectPath) {
@@ -165,6 +184,10 @@ function display(data) {
   let header = data.projectPath;
   if (!data.exists) header += chalk.dim(" (orphaned)");
   console.log(dot + " " + chalk.bold(header));
+  if (data.basenameCollisions.length > 0) {
+    console.log("  " + chalk.yellow("⚠ same basename elsewhere — `claude --resume` is cwd-scoped:"));
+    for (const c of data.basenameCollisions) console.log("  ⎿  " + chalk.dim(c));
+  }
   console.log();
 
   // CLAUDE.md
@@ -236,6 +259,7 @@ function display(data) {
       console.log("  ⎿  " + label);
       console.log("     created: " + formatDate(s.created) + "  last: " + formatDate(s.lastInteraction));
     }
+    if (data.resumeHint) console.log("     " + chalk.dim("resume: " + data.resumeHint));
   } else {
     console.log("  " + chalk.dim("none"));
   }
